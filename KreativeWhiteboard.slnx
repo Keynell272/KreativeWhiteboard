@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="KreativeWhiteboard.Api/KreativeWhiteboard.Api.csproj" />
+  <Project Path="KreativeWhiteboard.Shared/KreativeWhiteboard.Shared.csproj" />
+  <Project Path="KreativeWhiteboard.Web/KreativeWhiteboard.Web.csproj" />
+</Solution>
