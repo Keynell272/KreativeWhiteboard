@@ -1,0 +1,30 @@
+@page "/board/{id:guid}"
+@inject IHttpClientFactory HttpClientFactory
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Board</PageTitle>
+
+@if (board is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <div>
+        <h1>@board.Title</h1>
+        <p>@board.Description</p>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private Board? board;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
+    }
+}
