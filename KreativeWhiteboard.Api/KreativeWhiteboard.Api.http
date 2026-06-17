@@ -1,6 +1,14 @@
-@KreativeWhiteboard.Api_HostAddress = http://localhost:5122
+@baseUrl = http://localhost:5122
 
-GET {{KreativeWhiteboard.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Obtener todos los boards
+GET {{baseUrl}}/api/boards
 
-###
+### Crear un board
+POST {{baseUrl}}/api/boards
+Content-Type: application/json
+
+{
+  "title": "Mi primer board",
+  "description": "Board de prueba",
+  "ownerId": "00000000-0000-0000-0000-000000000001"
+}
