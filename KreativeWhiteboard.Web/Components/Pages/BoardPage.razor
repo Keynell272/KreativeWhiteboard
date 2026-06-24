@@ -1,18 +1,75 @@
+@inject IJSRuntime JS
 @page "/board/{id:guid}"
 @inject IHttpClientFactory HttpClientFactory
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
-<PageTitle>Board</PageTitle>
+<PageTitle>@(board?.Title ?? "Board") — Kreative</PageTitle>
 
-@if (board is null)
+@if (error is not null)
 {
-    <p>Cargando...</p>
+    <div class="flex items-center justify-center h-screen bg-gray-950">
+        <p class="text-red-400">Error: @error</p>
+    </div>
+}
+else if (board is null)
+{
+    <div class="flex items-center justify-center h-screen bg-gray-950">
+        <p class="text-gray-500">Cargando...</p>
+    </div>
 }
 else
 {
-    <div>
-        <h1>@board.Title</h1>
-        <p>@board.Description</p>
+    <div class="flex flex-col h-screen bg-gray-950">
+
+        <div class="flex items-center justify-between px-6 py-3 bg-gray-900 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <a href="/" class="text-gray-400 hover:text-white transition-colors text-sm">← Mis Boards</a>
+                <span class="text-gray-700">|</span>
+                <h1 class="text-white font-semibold">@board.Title</h1>
+            </div>
+            <button @onclick="AgregarCard"
+                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors">
+                + Agregar nota
+            </button>
+        </div>
+
+        <div class="relative flex-1 overflow-auto bg-gray-950"
+             style="background-image: radial-gradient(circle, #374151 1px, transparent 1px); background-size: 32px 32px;">
+
+            @foreach (var card in cards)
+            {
+                <div class="absolute bg-gray-900 border border-gray-700 rounded-xl p-4 w-64 shadow-lg cursor-grab group"
+                    style="left: @(card.X)px; top: @(card.Y)px;"
+                    @ref="cardRefs[card.Id]">
+                    
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs text-indigo-400 font-medium uppercase tracking-wider">Nota</p>
+                        <button class="text-gray-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
+                                @onclick="() => EliminarCard(card)"
+                                @onclick:stopPropagation="true">
+                            ✕
+                        </button>
+                    </div>
+
+                    @if (cardEditandoId == card.Id)
+                    {
+                        <textarea class="w-full bg-transparent text-white text-sm resize-none outline-none min-h-20"
+                                @bind="card.Content"
+                                @onblur="() => GuardarCard(card)"
+                                autofocus>
+                        </textarea>
+                    }
+                    else
+                    {
+                        <p class="text-white text-sm cursor-text min-h-20 whitespace-pre-wrap"
+                        @onclick="() => cardEditandoId = card.Id">
+                            @card.Content
+                        </p>
+                    }
+                </div>
+            }
+
+        </div>
     </div>
 }
 
@@ -21,10 +78,88 @@ else
     public Guid Id { get; set; }
 
     private Board? board;
+    private List<Card> cards = new();
+    private string? error;
+    private Guid? cardEditandoId;
+    private int nextX = 80;
+    private int nextY = 80;
+    private Dictionary<Guid, ElementReference> cardRefs = new();
 
     protected override async Task OnInitializedAsync()
     {
+        try
+        {
+            var http = HttpClientFactory.CreateClient("KreativeApi");
+            board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
+            var result = await http.GetFromJsonAsync<List<Card>>($"api/cards?boardId={Id}");
+            if (result is not null) cards = result;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        foreach (var card in cards)
+        {
+            if (cardRefs.ContainsKey(card.Id))
+            {
+                await JS.InvokeVoidAsync("dragDrop.init",
+                    DotNetObjectReference.Create(this),
+                    card.Id,
+                    cardRefs[card.Id]);
+            }
+        }
+    }
+
+    private async Task AgregarCard()
+    {
         var http = HttpClientFactory.CreateClient("KreativeApi");
-        board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
+        var card = new Card
+        {
+            BoardId = Id,
+            Type = CardType.Note,
+            Title = "Nueva nota",
+            Content = "Escribe algo...",
+            X = nextX,
+            Y = nextY
+        };
+
+        var response = await http.PostAsJsonAsync("api/cards", card);
+        var creada = await response.Content.ReadFromJsonAsync<Card>();
+        if (creada is not null)
+        {
+            cards.Add(creada);
+            nextX += 20;
+            nextY += 20;
+            cardEditandoId = creada.Id;
+        }
+    }
+
+    private async Task GuardarCard(Card card)
+    {
+        cardEditandoId = null;
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+    }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y)
+    {
+        var card = cards.FirstOrDefault(c => c.Id == Guid.Parse(cardId));
+        if (card is null) return;
+        card.X = x;
+        card.Y = y;
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+    }
+
+    private async Task EliminarCard(Card card)
+    {
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.DeleteAsync($"api/cards/{card.Id}");
+        cards.Remove(card);
     }
 }

@@ -27,7 +27,7 @@ public class BoardsController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var board = await _db.Boards.FindAsync(id);
+        var board = await _db.Boards.FirstOrDefaultAsync(b => b.Id == id);
         if (board is null) return NotFound();
         return Ok(board);
     }
