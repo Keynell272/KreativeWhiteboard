@@ -1,0 +1,55 @@
+<div class="@ContainerClass">
+
+    <a href="/" class="@ButtonClass" title="Mis Boards">
+        <i data-lucide="layout-dashboard" class="@IconClass text-gray-400"></i>
+        <span class="@LabelClass">Home</span>
+    </a>
+
+    <div class="@DividerClass"></div>
+
+    <button @onclick="() => OnAddCard.InvokeAsync()" class="@ButtonClass group" title="Agregar nota">
+        <i data-lucide="sticky-note" class="@IconClass text-gray-400 group-hover:text-white transition-colors"></i>
+        <span class="@LabelClass">Nota</span>
+    </button>
+
+    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
+        <i data-lucide="image" class="@IconClass text-gray-400"></i>
+        <span class="@LabelClass">Imagen</span>
+    </button>
+
+    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
+        <i data-lucide="check-square" class="@IconClass text-gray-400"></i>
+        <span class="@LabelClass">Lista</span>
+    </button>
+
+    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
+        <i data-lucide="link" class="@IconClass text-gray-400"></i>
+        <span class="@LabelClass">Link</span>
+    </button>
+
+    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
+        <i data-lucide="spline" class="@IconClass text-gray-400"></i>
+        <span class="@LabelClass">Conector</span>
+    </button>
+
+</div>
+
+@code {
+    [Parameter] public bool IsMobile { get; set; }
+    [Parameter] public EventCallback OnAddCard { get; set; }
+
+    private string ContainerClass => IsMobile
+        ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"
+        : "flex flex-col items-center gap-1 w-16 bg-gray-900 border-r border-gray-800 py-4";
+
+    private string ButtonClass => IsMobile
+        ? "flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg hover:bg-gray-800 transition-colors"
+        : "flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors";
+
+    private string IconClass => IsMobile ? "w-5 h-5" : "w-5 h-5";
+    private string LabelClass => "text-gray-500 text-[10px]";
+
+    private string DividerClass => IsMobile
+        ? "w-px h-8 bg-gray-800"
+        : "w-8 border-t border-gray-800 my-1";
+}

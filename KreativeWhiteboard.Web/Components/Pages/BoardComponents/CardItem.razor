@@ -1,0 +1,49 @@
+@inject IJSRuntime JS
+
+<div class="absolute rounded-xl shadow-xl group select-none"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @CardWidth; background: #111827; border: 1px solid #1f2937;"
+     @ref="ElementRef">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
+        <div class="flex items-center gap-1.5">
+            <i data-lucide="sticky-note" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-indigo-400 text-[10px] font-semibold uppercase tracking-widest">Nota</span>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                @onclick="() => OnDelete.InvokeAsync(Card)"
+                @onclick:stopPropagation="true">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <!-- Contenido -->
+    <div class="px-3 pb-3">
+        @if (IsEditing)
+        {
+            <textarea class="w-full bg-transparent text-gray-200 text-sm resize-none outline-none min-h-24 leading-relaxed"
+                      @bind="Card.Content"
+                      @onblur="() => OnSave.InvokeAsync(Card)"
+                      autofocus>
+            </textarea>
+        }
+        else
+        {
+            <p class="text-gray-300 text-sm cursor-text min-h-24 whitespace-pre-wrap leading-relaxed"
+               @onclick="() => OnEdit.InvokeAsync(Card.Id)">
+                @(string.IsNullOrEmpty(Card.Content) ? "Escribe algo..." : Card.Content)
+            </p>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; } = null!;
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public ElementReference ElementRef { get; set; }
+    [Parameter] public EventCallback<Card> OnDelete { get; set; }
+    [Parameter] public EventCallback<Card> OnSave { get; set; }
+    [Parameter] public EventCallback<Guid> OnEdit { get; set; }
+
+    private string CardWidth => "240px";
+}

@@ -14,61 +14,117 @@
 else if (board is null)
 {
     <div class="flex items-center justify-center h-screen bg-gray-950">
-        <p class="text-gray-500">Cargando...</p>
+        <p class="text-gray-500 text-sm">Cargando...</p>
     </div>
 }
 else
 {
-    <div class="flex flex-col h-screen bg-gray-950">
+    <div class="flex h-screen bg-gray-950 overflow-hidden">
 
-        <div class="flex items-center justify-between px-6 py-3 bg-gray-900 border-b border-gray-800">
-            <div class="flex items-center gap-3">
-                <a href="/" class="text-gray-400 hover:text-white transition-colors text-sm">← Mis Boards</a>
-                <span class="text-gray-700">|</span>
-                <h1 class="text-white font-semibold">@board.Title</h1>
-            </div>
+        <!-- Sidebar izquierdo de herramientas -->
+        <div class="flex flex-col items-center gap-1 w-16 bg-gray-900 border-r border-gray-800 py-4 z-10">
+            
+            <!-- Logo / Home -->
+            <a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-800 transition-colors mb-2" title="Mis Boards">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-gray-400"></i>
+            </a>
+
+            <div class="w-8 border-t border-gray-800 my-1"></div>
+
+            <!-- Herramientas -->
             <button @onclick="AgregarCard"
-                    class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors">
-                + Agregar nota
+                    class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group"
+                    title="Agregar nota">
+                <i data-lucide="sticky-note" class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors"></i>
+                <span class="text-gray-500 text-[10px] group-hover:text-gray-300 transition-colors">Nota</span>
             </button>
+
+            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
+                    title="Próximamente">
+                <i data-lucide="image" class="w-5 h-5 text-gray-400"></i>
+                <span class="text-gray-500 text-[10px]">Imagen</span>
+            </button>
+
+            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
+                    title="Próximamente">
+                <i data-lucide="check-square" class="w-5 h-5 text-gray-400"></i>
+                <span class="text-gray-500 text-[10px]">Lista</span>
+            </button>
+
+            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
+                    title="Próximamente">
+                <i data-lucide="link" class="w-5 h-5 text-gray-400"></i>
+                <span class="text-gray-500 text-[10px]">Link</span>
+            </button>
+
+            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
+                    title="Próximamente">
+                <i data-lucide="spline" class="w-5 h-5 text-gray-400"></i>
+                <span class="text-gray-500 text-[10px]">Conector</span>
+            </button>
+
         </div>
 
-        <div class="relative flex-1 overflow-auto bg-gray-950"
-             style="background-image: radial-gradient(circle, #374151 1px, transparent 1px); background-size: 32px 32px;">
+        <!-- Contenido principal -->
+        <div class="flex flex-col flex-1 overflow-hidden">
 
-            @foreach (var card in cards)
-            {
-                <div class="absolute bg-gray-900 border border-gray-700 rounded-xl p-4 w-64 shadow-lg cursor-grab group"
-                    style="left: @(card.X)px; top: @(card.Y)px;"
-                    @ref="cardRefs[card.Id]">
-                    
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="text-xs text-indigo-400 font-medium uppercase tracking-wider">Nota</p>
-                        <button class="text-gray-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100 text-xs"
-                                @onclick="() => EliminarCard(card)"
-                                @onclick:stopPropagation="true">
-                            ✕
-                        </button>
-                    </div>
-
-                    @if (cardEditandoId == card.Id)
-                    {
-                        <textarea class="w-full bg-transparent text-white text-sm resize-none outline-none min-h-20"
-                                @bind="card.Content"
-                                @onblur="() => GuardarCard(card)"
-                                autofocus>
-                        </textarea>
-                    }
-                    else
-                    {
-                        <p class="text-white text-sm cursor-text min-h-20 whitespace-pre-wrap"
-                        @onclick="() => cardEditandoId = card.Id">
-                            @card.Content
-                        </p>
-                    }
+            <!-- Toolbar superior -->
+            <div class="flex items-center justify-between px-5 py-2.5 bg-gray-900 border-b border-gray-800">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-white font-semibold text-sm">@board.Title</h1>
                 </div>
-            }
+                <div class="flex items-center gap-2 text-gray-500 text-xs">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>Solo tú</span>
+                </div>
+            </div>
 
+            <!-- Canvas -->
+            <div class="relative flex-1 overflow-auto"
+                 style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;">
+
+                @foreach (var card in cards)
+                {
+                    <div class="absolute rounded-xl shadow-xl group select-none"
+                         style="left: @(card.X)px; top: @(card.Y)px; width: 240px; background: #111827; border: 1px solid #1f2937;"
+                         @ref="cardRefs[card.Id]">
+
+                        <!-- Header de la card -->
+                        <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
+                            <div class="flex items-center gap-1.5">
+                                <i data-lucide="sticky-note" class="w-3.5 h-3.5 text-indigo-400"></i>
+                                <span class="text-indigo-400 text-[10px] font-semibold uppercase tracking-widest">Nota</span>
+                            </div>
+                            <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                                    @onclick="() => EliminarCard(card)"
+                                    @onclick:stopPropagation="true">
+                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+
+                        <!-- Contenido -->
+                        <div class="px-3 pb-3">
+                            @if (cardEditandoId == card.Id)
+                            {
+                                <textarea class="w-full bg-transparent text-gray-200 text-sm resize-none outline-none min-h-24 leading-relaxed"
+                                          @bind="card.Content"
+                                          @onblur="() => GuardarCard(card)"
+                                          autofocus>
+                                </textarea>
+                            }
+                            else
+                            {
+                                <p class="text-gray-300 text-sm cursor-text min-h-24 whitespace-pre-wrap leading-relaxed"
+                                   @onclick="() => cardEditandoId = card.Id">
+                                    @(string.IsNullOrEmpty(card.Content) ? "Escribe algo..." : card.Content)
+                                </p>
+                            }
+                        </div>
+
+                    </div>
+                }
+
+            </div>
         </div>
     </div>
 }
@@ -92,7 +148,15 @@ else
             var http = HttpClientFactory.CreateClient("KreativeApi");
             board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
             var result = await http.GetFromJsonAsync<List<Card>>($"api/cards?boardId={Id}");
-            if (result is not null) cards = result;
+            if (result is not null)
+            {
+                cards = result;
+                if (cards.Any())
+                {
+                    nextX = (int)cards.Max(c => c.X) + 20;
+                    nextY = (int)cards.Max(c => c.Y) + 20;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -112,6 +176,7 @@ else
                     cardRefs[card.Id]);
             }
         }
+        await JS.InvokeVoidAsync("lucide.createIcons");
     }
 
     private async Task AgregarCard()
@@ -122,7 +187,7 @@ else
             BoardId = Id,
             Type = CardType.Note,
             Title = "Nueva nota",
-            Content = "Escribe algo...",
+            Content = "",
             X = nextX,
             Y = nextY
         };
@@ -132,9 +197,10 @@ else
         if (creada is not null)
         {
             cards.Add(creada);
-            nextX += 20;
-            nextY += 20;
+            nextX += 30;
+            nextY += 30;
             cardEditandoId = creada.Id;
+            StateHasChanged();
         }
     }
 
@@ -161,5 +227,6 @@ else
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.DeleteAsync($"api/cards/{card.Id}");
         cards.Remove(card);
+        StateHasChanged();
     }
 }
