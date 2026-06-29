@@ -1,0 +1,121 @@
+@inject IJSRuntime JS
+
+<div class="absolute rounded-xl shadow-xl group select-none board-card-element"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: 200px; background: #1e1b4b; border: 1px solid #3730a3;"
+     @ref="elementRef"
+     data-board-card="true"
+     @onclick="HandleClick"
+     @oncontextmenu="HandleContextMenu"
+     @oncontextmenu:preventDefault="true"
+     @ontouchstart="HandleTouchStart"
+     @ontouchend="HandleTouchEnd"
+     @ontouchmove="HandleTouchMove">
+
+    <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
+        <div class="flex items-center gap-1.5">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-300"></i>
+            <span class="text-indigo-300 text-[10px] font-semibold uppercase tracking-widest">Board</span>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-800 hover:text-red-400"
+                @onclick="() => OnDelete.InvokeAsync(Card)"
+                @onclick:stopPropagation="true">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <div class="px-3 pb-4 pt-1" @onmousedown:stopPropagation="true">
+        <p class="text-white font-medium text-sm">@Card.Title</p>
+        <p class="text-indigo-400 text-xs mt-1">Click para abrir</p>
+    </div>
+
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; } = null!;
+    [Parameter] public EventCallback<Card> OnDelete { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<Guid> OnNavigate { get; set; }
+    [Parameter] public EventCallback<Card> OnSave { get; set; }
+    [Parameter] public EventCallback<(Card, double, double)> OnContextMenu { get; set; }
+
+    private ElementReference elementRef;
+    private bool dragInitialized = false;
+    private bool isDragging = false;
+    private bool justFinishedDragging = false;
+
+    private double touchStartX, touchStartY;
+    private bool longPressTriggered = false;
+    private System.Threading.Timer? longPressTimer;
+
+    private void HandleClick(MouseEventArgs e)
+    {
+        if (!isDragging && !justFinishedDragging)
+            OnNavigate.InvokeAsync(Card.LinkedBoardId ?? Guid.Empty);
+    }
+
+    private void HandleContextMenu(MouseEventArgs e)
+    {
+        OnContextMenu.InvokeAsync((Card, e.ClientX, e.ClientY));
+    }
+
+    private void HandleTouchStart(TouchEventArgs e)
+    {
+        longPressTriggered = false;
+        isDragging = false;
+        if (e.Touches.Length > 0)
+        {
+            touchStartX = e.Touches[0].ClientX;
+            touchStartY = e.Touches[0].ClientY;
+        }
+        longPressTimer = new System.Threading.Timer(_ =>
+        {
+            if (!isDragging)
+            {
+                longPressTriggered = true;
+                InvokeAsync(() => OnContextMenu.InvokeAsync((Card, touchStartX, touchStartY)));
+            }
+        }, null, 600, System.Threading.Timeout.Infinite);
+    }
+
+    private void HandleTouchEnd(TouchEventArgs e)
+    {
+        longPressTimer?.Dispose();
+        longPressTriggered = false;
+    }
+
+    private void HandleTouchMove(TouchEventArgs e)
+    {
+        isDragging = true;
+        longPressTimer?.Dispose();
+    }
+
+    [JSInvokable]
+    public void SetDragging(bool dragging)
+    {
+        isDragging = dragging;
+        if (!dragging)
+        {
+            justFinishedDragging = true;
+            Task.Delay(200).ContinueWith(_ => justFinishedDragging = false);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y)
+    {
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!dragInitialized)
+        {
+            dragInitialized = true;
+            await JS.InvokeVoidAsync("dragDrop.init",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+            await JS.InvokeVoidAsync("lucide.createIcons");
+        }
+    }
+}

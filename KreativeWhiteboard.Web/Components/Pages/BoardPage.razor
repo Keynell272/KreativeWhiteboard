@@ -1,7 +1,10 @@
 @inject IJSRuntime JS
 @page "/board/{id:guid}"
+@layout BoardLayout
 @inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using KreativeWhiteboard.Web.Components.Pages.BoardComponents
 
 <PageTitle>@(board?.Title ?? "Board") — Kreative</PageTitle>
 
@@ -21,61 +24,50 @@ else
 {
     <div class="flex h-screen bg-gray-950 overflow-hidden">
 
-        <!-- Sidebar izquierdo de herramientas -->
-        <div class="flex flex-col items-center gap-1 w-16 bg-gray-900 border-r border-gray-800 py-4 z-10">
-            
-            <!-- Logo / Home -->
-            <a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg hover:bg-gray-800 transition-colors mb-2" title="Mis Boards">
-                <i data-lucide="layout-dashboard" class="w-5 h-5 text-gray-400"></i>
-            </a>
-
-            <div class="w-8 border-t border-gray-800 my-1"></div>
-
-            <!-- Herramientas -->
-            <button @onclick="AgregarCard"
-                    class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group"
-                    title="Agregar nota">
-                <i data-lucide="sticky-note" class="w-5 h-5 text-gray-400 group-hover:text-white transition-colors"></i>
-                <span class="text-gray-500 text-[10px] group-hover:text-gray-300 transition-colors">Nota</span>
-            </button>
-
-            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
-                    title="Próximamente">
-                <i data-lucide="image" class="w-5 h-5 text-gray-400"></i>
-                <span class="text-gray-500 text-[10px]">Imagen</span>
-            </button>
-
-            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
-                    title="Próximamente">
-                <i data-lucide="check-square" class="w-5 h-5 text-gray-400"></i>
-                <span class="text-gray-500 text-[10px]">Lista</span>
-            </button>
-
-            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
-                    title="Próximamente">
-                <i data-lucide="link" class="w-5 h-5 text-gray-400"></i>
-                <span class="text-gray-500 text-[10px]">Link</span>
-            </button>
-
-            <button class="flex flex-col items-center gap-1 w-12 py-2 rounded-lg hover:bg-gray-800 transition-colors group opacity-40 cursor-not-allowed"
-                    title="Próximamente">
-                <i data-lucide="spline" class="w-5 h-5 text-gray-400"></i>
-                <span class="text-gray-500 text-[10px]">Conector</span>
-            </button>
-
+        <div class="hidden md:flex">
+            <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" />
         </div>
 
-        <!-- Contenido principal -->
         <div class="flex flex-col flex-1 overflow-hidden">
 
-            <!-- Toolbar superior -->
-            <div class="flex items-center justify-between px-5 py-2.5 bg-gray-900 border-b border-gray-800">
-                <div class="flex items-center gap-3">
-                    <h1 class="text-white font-semibold text-sm">@board.Title</h1>
+            <!-- Toolbar superior con breadcrumb -->
+            <div class="flex items-center justify-between px-4 py-2.5 bg-gray-900 border-b border-gray-800">
+                <div class="flex items-center gap-2 flex-wrap">
+                    @for (int i = 0; i < breadcrumb.Count; i++)
+                    {
+                        var item = breadcrumb[i];
+                        var isLast = i == breadcrumb.Count - 1;
+
+                        @if (isLast)
+                        {
+                            @if (editandoTituloBoard && board?.ParentCardId == null)
+                            {
+                                <input class="bg-transparent text-white font-semibold text-sm outline-none border-b border-indigo-500"
+                                    @bind="tituloBoard"
+                                    @onblur="GuardarTituloBoard"
+                                    autofocus />
+                            }
+                            else
+                            {
+                                <span class="text-white font-semibold text-sm @(board?.ParentCardId == null ? "cursor-text" : "")"
+                                    @onclick="() => { if (board?.ParentCardId == null) editandoTituloBoard = true; }">
+                                    @item.Title
+                                </span>
+                            }
+                        }
+                        else
+                        {
+                            <a href="/board/@item.Id"
+                            class="text-gray-400 hover:text-white transition-colors text-sm">
+                                @item.Title
+                            </a>
+                            <span class="text-gray-700 text-sm">›</span>
+                        }
+                    }
                 </div>
                 <div class="flex items-center gap-2 text-gray-500 text-xs">
                     <i data-lucide="users" class="w-4 h-4"></i>
-                    <span>Solo tú</span>
+                    <span class="hidden sm:inline">Solo tú</span>
                 </div>
             </div>
 
@@ -85,98 +77,178 @@ else
 
                 @foreach (var card in cards)
                 {
-                    <div class="absolute rounded-xl shadow-xl group select-none"
-                         style="left: @(card.X)px; top: @(card.Y)px; width: 240px; background: #111827; border: 1px solid #1f2937;"
-                         @ref="cardRefs[card.Id]">
+                    @if (card.Type == CardType.Board)
+                    {
+                        <BoardCard Card="card"
+                            OnDelete="EliminarCard"
+                            OnMove="HandleCardMoved"
+                            OnNavigate="Navegar"
+                            OnSave="GuardarCard"
+                            OnContextMenu="HandleBoardContextMenu" />
+                    }
+                    else
+                    {
+                        <CardItem Card="card"
+                                  IsEditing="cardEditandoId == card.Id"
+                                  OnDelete="EliminarCard"
+                                  OnSave="GuardarCard"
+                                  OnEdit="(id) => { cardEditandoId = id; }"
+                                  OnMove="HandleCardMoved" />
+                    }
+                }
 
-                        <!-- Header de la card -->
-                        <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
-                            <div class="flex items-center gap-1.5">
-                                <i data-lucide="sticky-note" class="w-3.5 h-3.5 text-indigo-400"></i>
-                                <span class="text-indigo-400 text-[10px] font-semibold uppercase tracking-widest">Nota</span>
+                @if (mostrarMenuBoard)
+                {
+                    <div class="fixed inset-0 z-40" @onclick="CerrarMenuBoard"></div>
+                    <div class="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-36"
+                        style="left: @(menuBoardX)px; top: @(menuBoardY)px;">
+                        <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                                @onclick="AbrirModalBoard">
+                            <span>✏️</span> Editar nombre
+                        </button>
+                        <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
+                                @onclick="() => { CerrarMenuBoard(); if (cardMenuActual?.LinkedBoardId != null) Navegar(cardMenuActual.LinkedBoardId.Value); }">
+                            <span>→</span> Abrir board
+                        </button>
+                        <div class="border-t border-gray-700 my-1"></div>
+                        <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-gray-700 transition-colors"
+                                @onclick="() => { CerrarMenuBoard(); if (cardMenuActual != null) EliminarCard(cardMenuActual); }">
+                            <span>🗑️</span> Eliminar
+                        </button>
+                    </div>
+                }
+
+                @if (mostrarModalBoard)
+                {
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @onclick="CerrarModalBoard">
+                        <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-2xl" @onclick:stopPropagation="true">
+                            <h3 class="text-white font-semibold mb-4">Editar nombre del board</h3>
+                            <input class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500 mb-4"
+                                @bind="tituloEditadoBoard"
+                                @onkeydown="HandleKeyDownBoard" />
+                            <div class="flex gap-2 justify-end">
+                                <button class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
+                                        @onclick="CerrarModalBoard">
+                                    Cancelar
+                                </button>
+                                <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm transition-colors"
+                                        @onclick="GuardarTituloBoard2">
+                                    Guardar
+                                </button>
                             </div>
-                            <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
-                                    @onclick="() => EliminarCard(card)"
-                                    @onclick:stopPropagation="true">
-                                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                            </button>
                         </div>
-
-                        <!-- Contenido -->
-                        <div class="px-3 pb-3">
-                            @if (cardEditandoId == card.Id)
-                            {
-                                <textarea class="w-full bg-transparent text-gray-200 text-sm resize-none outline-none min-h-24 leading-relaxed"
-                                          @bind="card.Content"
-                                          @onblur="() => GuardarCard(card)"
-                                          autofocus>
-                                </textarea>
-                            }
-                            else
-                            {
-                                <p class="text-gray-300 text-sm cursor-text min-h-24 whitespace-pre-wrap leading-relaxed"
-                                   @onclick="() => cardEditandoId = card.Id">
-                                    @(string.IsNullOrEmpty(card.Content) ? "Escribe algo..." : card.Content)
-                                </p>
-                            }
-                        </div>
-
                     </div>
                 }
 
             </div>
+
+            <div class="flex md:hidden">
+                <BoardToolbar IsMobile="true" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" />
+            </div>
+
         </div>
     </div>
 }
 
 @code {
-    [Parameter]
-    public Guid Id { get; set; }
+
+    private bool mostrarMenuBoard = false;
+    private bool mostrarModalBoard = false;
+    private double menuBoardX, menuBoardY;
+    private Card? cardMenuActual;
+    private string tituloEditadoBoard = "";
+
+    private void HandleBoardContextMenu((Card card, double x, double y) args)
+    {
+        cardMenuActual = args.card;
+        menuBoardX = args.x;
+        menuBoardY = args.y;
+        mostrarMenuBoard = true;
+        mostrarModalBoard = false;
+    }
+
+    private void CerrarMenuBoard() => mostrarMenuBoard = false;
+
+    private void AbrirModalBoard()
+    {
+        tituloEditadoBoard = cardMenuActual?.Title ?? "";
+        mostrarMenuBoard = false;
+        mostrarModalBoard = true;
+    }
+
+    private void CerrarModalBoard() => mostrarModalBoard = false;
+
+    private async Task GuardarTituloBoard2()
+    {
+        if (cardMenuActual is null || string.IsNullOrWhiteSpace(tituloEditadoBoard)) return;
+        cardMenuActual.Title = tituloEditadoBoard;
+        mostrarModalBoard = false;
+        await GuardarCard(cardMenuActual);
+    }
+
+    private async Task HandleKeyDownBoard(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await GuardarTituloBoard2();
+        if (e.Key == "Escape") CerrarModalBoard();
+    }
+
+    private void Navegar(Guid id)
+    {
+        Nav.NavigateTo($"/board/{id}");
+    }
+
+    [Parameter] public Guid Id { get; set; }
+
+    private static readonly Guid OwnerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private Board? board;
     private List<Card> cards = new();
+    private List<BreadcrumbItem> breadcrumb = new();
     private string? error;
     private Guid? cardEditandoId;
     private int nextX = 80;
     private int nextY = 80;
-    private Dictionary<Guid, ElementReference> cardRefs = new();
 
     protected override async Task OnInitializedAsync()
     {
+        await CargarBoard();
+        tituloBoard = board?.Title ?? "";
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await CargarBoard();
+    }
+
+    private async Task CargarBoard()
+    {
         try
         {
+            error = null;
+            board = null;
+            cards = new();
+            breadcrumb = new();
+
             var http = HttpClientFactory.CreateClient("KreativeApi");
+
             board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
             var result = await http.GetFromJsonAsync<List<Card>>($"api/cards?boardId={Id}");
-            if (result is not null)
+            var bc = await http.GetFromJsonAsync<List<BreadcrumbItem>>($"api/boards/{Id}/breadcrumb");
+
+            if (result is not null) cards = result;
+            if (bc is not null) breadcrumb = bc;
+
+            if (cards.Any())
             {
-                cards = result;
-                if (cards.Any())
-                {
-                    nextX = (int)cards.Max(c => c.X) + 20;
-                    nextY = (int)cards.Max(c => c.Y) + 20;
-                }
+                nextX = (int)cards.Max(c => c.X) + 20;
+                nextY = (int)cards.Max(c => c.Y) + 20;
             }
         }
         catch (Exception ex)
         {
             error = ex.Message;
         }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        foreach (var card in cards)
-        {
-            if (cardRefs.ContainsKey(card.Id))
-            {
-                await JS.InvokeVoidAsync("dragDrop.init",
-                    DotNetObjectReference.Create(this),
-                    card.Id,
-                    cardRefs[card.Id]);
-            }
-        }
-        await JS.InvokeVoidAsync("lucide.createIcons");
+        tituloBoard = board?.Title ?? "";
     }
 
     private async Task AgregarCard()
@@ -204,20 +276,72 @@ else
         }
     }
 
+    private async Task AgregarBoard()
+    {
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+
+        // Crear el board hijo
+        var nuevoBoard = new Board
+        {
+            Title = "Nuevo Board",
+            OwnerId = OwnerId,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        var boardResponse = await http.PostAsJsonAsync("api/boards", nuevoBoard);
+        var boardCreado = await boardResponse.Content.ReadFromJsonAsync<Board>();
+        if (boardCreado is null) return;
+
+        // Crear la card que representa ese board
+        var card = new Card
+        {
+            BoardId = Id,
+            Type = CardType.Board,
+            Title = boardCreado.Title,
+            LinkedBoardId = boardCreado.Id,
+            Content = "",
+            X = nextX,
+            Y = nextY
+        };
+
+        var cardResponse = await http.PostAsJsonAsync("api/cards", card);
+        var cardCreada = await cardResponse.Content.ReadFromJsonAsync<Card>();
+        if (cardCreada is null) return;
+
+        // Actualizar el board hijo con el ParentCardId
+        boardCreado.ParentCardId = cardCreada.Id;
+        await http.PutAsJsonAsync($"api/boards/{boardCreado.Id}", boardCreado);
+
+        cards.Add(cardCreada);
+        nextX += 30;
+        nextY += 30;
+        StateHasChanged();
+    }
+
     private async Task GuardarCard(Card card)
     {
         cardEditandoId = null;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+
+        if (card.Type == CardType.Board && card.LinkedBoardId.HasValue)
+        {
+            var boardVinculado = await http.GetFromJsonAsync<Board>($"api/boards/{card.LinkedBoardId}");
+            if (boardVinculado is not null)
+            {
+                boardVinculado.Title = card.Title;
+                await http.PutAsJsonAsync($"api/boards/{boardVinculado.Id}", boardVinculado);
+            }
+        }
     }
 
-    [JSInvokable]
-    public async Task OnCardMoved(string cardId, int x, int y)
+    private async Task HandleCardMoved((Guid id, int x, int y) args)
     {
-        var card = cards.FirstOrDefault(c => c.Id == Guid.Parse(cardId));
+        var card = cards.FirstOrDefault(c => c.Id == args.id);
         if (card is null) return;
-        card.X = x;
-        card.Y = y;
+        card.X = args.x;
+        card.Y = args.y;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
     }
@@ -227,6 +351,33 @@ else
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.DeleteAsync($"api/cards/{card.Id}");
         cards.Remove(card);
+        StateHasChanged();
+    }
+
+    private bool editandoTituloBoard = false;
+    private string tituloBoard = "";
+
+    private async Task GuardarTituloBoard()
+    {
+        editandoTituloBoard = false;
+        if (string.IsNullOrWhiteSpace(tituloBoard) || board is null) return;
+        board.Title = tituloBoard;
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.PutAsJsonAsync($"api/boards/{board.Id}", board);
+        await CargarBoard();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("preventContextMenu", DotNetObjectReference.Create(this));
+        await JS.InvokeVoidAsync("lucide.createIcons");
+    }
+
+    [JSInvokable]
+    public void CerrarMenuDesdeJS()
+    {
+        mostrarMenuBoard = false;
         StateHasChanged();
     }
 }

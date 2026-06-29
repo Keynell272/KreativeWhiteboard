@@ -1,100 +1,16 @@
 ﻿@page "/"
 @inject IHttpClientFactory HttpClientFactory
+@inject NavigationManager Nav
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
-<PageTitle>Mis Boards — Kreative</PageTitle>
-
-<div class="p-8">
-    <div class="flex items-center justify-between mb-8">
-        <h1 class="text-2xl font-bold text-white">Mis Boards</h1>
-        <button @onclick="MostrarFormulario"
-                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors">
-            + Nuevo Board
-        </button>
-    </div>
-
-    @if (mostrarFormulario)
-    {
-        <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 mb-8 max-w-md">
-            <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">Nuevo Board</h2>
-            <div class="flex flex-col gap-3">
-                <input @bind="nuevoTitulo" placeholder="Nombre del board"
-                       class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500" />
-                <input @bind="nuevaDescripcion" placeholder="Descripción (opcional)"
-                       class="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 text-sm focus:outline-none focus:border-indigo-500" />
-                <div class="flex gap-2 mt-1">
-                    <button @onclick="CrearBoard"
-                            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-medium transition-colors">
-                        Crear
-                    </button>
-                    <button @onclick="() => mostrarFormulario = false"
-                            class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors">
-                        Cancelar
-                    </button>
-                </div>
-            </div>
-        </div>
-    }
-
-    @if (boards is null)
-    {
-        <p class="text-gray-500">Cargando...</p>
-    }
-    else if (boards.Count == 0)
-    {
-        <p class="text-gray-500">No tienes boards todavía. ¡Crea uno!</p>
-    }
-    else
-    {
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            @foreach (var board in boards)
-            {
-                <a href="/board/@board.Id"
-                   class="group bg-gray-900 border border-gray-800 hover:border-indigo-500 rounded-xl p-5 transition-all cursor-pointer">
-                    <h3 class="text-white font-semibold mb-1 group-hover:text-indigo-400 transition-colors">@board.Title</h3>
-                    <p class="text-gray-500 text-sm">@board.Description</p>
-                </a>
-            }
-        </div>
-    }
-</div>
-
 @code {
-    private List<Board>? boards;
-    private bool mostrarFormulario = false;
-    private string nuevoTitulo = "";
-    private string nuevaDescripcion = "";
+    private static readonly Guid OwnerId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     protected override async Task OnInitializedAsync()
     {
-        await CargarBoards();
-    }
-
-    private async Task CargarBoards()
-    {
         var http = HttpClientFactory.CreateClient("KreativeApi");
-        boards = await http.GetFromJsonAsync<List<Board>>("api/boards");
-    }
-
-    private void MostrarFormulario()
-    {
-        mostrarFormulario = true;
-        nuevoTitulo = "";
-        nuevaDescripcion = "";
-    }
-
-    private async Task CrearBoard()
-    {
-        if (string.IsNullOrWhiteSpace(nuevoTitulo)) return;
-        var http = HttpClientFactory.CreateClient("KreativeApi");
-        var nuevoBoard = new Board
-        {
-            Title = nuevoTitulo,
-            Description = nuevaDescripcion,
-            OwnerId = Guid.Parse("00000000-0000-0000-0000-000000000001")
-        };
-        await http.PostAsJsonAsync("api/boards", nuevoBoard);
-        mostrarFormulario = false;
-        await CargarBoards();
+        var root = await http.GetFromJsonAsync<Board>($"api/boards/root?ownerId={OwnerId}");
+        if (root is not null)
+            Nav.NavigateTo($"/board/{root.Id}");
     }
 }

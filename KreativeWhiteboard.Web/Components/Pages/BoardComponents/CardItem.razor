@@ -1,8 +1,8 @@
 @inject IJSRuntime JS
 
 <div class="absolute rounded-xl shadow-xl group select-none"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: @CardWidth; background: #111827; border: 1px solid #1f2937;"
-     @ref="ElementRef">
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: 240px; background: #111827; border: 1px solid #1f2937;"
+     @ref="elementRef">
 
     <!-- Header -->
     <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
@@ -40,10 +40,33 @@
 @code {
     [Parameter] public Card Card { get; set; } = null!;
     [Parameter] public bool IsEditing { get; set; }
-    [Parameter] public ElementReference ElementRef { get; set; }
     [Parameter] public EventCallback<Card> OnDelete { get; set; }
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<Guid> OnEdit { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int)> OnMove { get; set; }
 
-    private string CardWidth => "240px";
+    private ElementReference elementRef;
+    private bool dragInitialized = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!dragInitialized)
+        {
+            dragInitialized = true;
+            await JS.InvokeVoidAsync("dragDrop.init",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+            await JS.InvokeVoidAsync("lucide.createIcons");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y)
+    {
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y));
+    }
+
+    [JSInvokable]
+    public void SetDragging(bool dragging) { }
 }
