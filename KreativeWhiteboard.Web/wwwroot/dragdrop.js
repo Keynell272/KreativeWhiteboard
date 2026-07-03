@@ -52,3 +52,82 @@ window.preventContextMenu = function (dotnet) {
         }
     });
 };
+window.uploadImageFromInput = async function (inputId, dotnet) {
+    const input = document.getElementById(inputId);
+    if (!input || !input.files || input.files.length === 0) return;
+
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('http://localhost:5122/api/storage/upload', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        dotnet.invokeMethodAsync('OnImageUploaded', data.url);
+    } catch (err) {
+        console.error('Upload failed:', err);
+    }
+};
+window.initImageInput = async function (inputId, dotnet) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    
+    input.addEventListener('change', async function () {
+        const file = input.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('http://localhost:5122/api/storage/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            dotnet.invokeMethodAsync('OnImageUploaded', data.url);
+        } catch (err) {
+            console.error('Upload failed:', err);
+        }
+    });
+};
+window.createImageInput = function (inputId, dotnet) {
+    // Remover si ya existe
+    const existing = document.getElementById(inputId);
+    if (existing) existing.remove();
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.id = inputId;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', async function () {
+        const file = input.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('http://localhost:5122/api/storage/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            dotnet.invokeMethodAsync('OnImageUploaded', data.url);
+        } catch (err) {
+            console.error('Upload failed:', err);
+        }
+    });
+};
+
+window.triggerImageInput = function (inputId) {
+    const input = document.getElementById(inputId);
+    if (input) input.click();
+};

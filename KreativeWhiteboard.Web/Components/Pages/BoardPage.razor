@@ -25,7 +25,7 @@ else
     <div class="flex h-screen bg-gray-950 overflow-hidden">
 
         <div class="hidden md:flex">
-            <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" />
+            <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
         </div>
 
         <div class="flex flex-col flex-1 overflow-hidden">
@@ -86,14 +86,21 @@ else
                             OnSave="GuardarCard"
                             OnContextMenu="HandleBoardContextMenu" />
                     }
+                    else if (card.Type == CardType.Image)
+                    {
+                        <ImageCard Card="card"
+                                OnDelete="EliminarCard"
+                                OnMove="HandleCardMoved"
+                                OnSave="GuardarCard" />
+                    }
                     else
                     {
                         <CardItem Card="card"
-                                  IsEditing="cardEditandoId == card.Id"
-                                  OnDelete="EliminarCard"
-                                  OnSave="GuardarCard"
-                                  OnEdit="(id) => { cardEditandoId = id; }"
-                                  OnMove="HandleCardMoved" />
+                                IsEditing="cardEditandoId == card.Id"
+                                OnDelete="EliminarCard"
+                                OnSave="GuardarCard"
+                                OnEdit="(id) => { cardEditandoId = id; }"
+                                OnMove="HandleCardMoved" />
                     }
                 }
 
@@ -143,7 +150,7 @@ else
             </div>
 
             <div class="flex md:hidden">
-                <BoardToolbar IsMobile="true" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" />
+                <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
             </div>
 
         </div>
@@ -379,5 +386,29 @@ else
     {
         mostrarMenuBoard = false;
         StateHasChanged();
+    }
+
+    private async Task AgregarImagen()
+    {
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        var card = new Card
+        {
+            BoardId = Id,
+            Type = CardType.Image,
+            Title = "Imagen",
+            Content = "",
+            X = nextX,
+            Y = nextY
+        };
+
+        var response = await http.PostAsJsonAsync("api/cards", card);
+        var creada = await response.Content.ReadFromJsonAsync<Card>();
+        if (creada is not null)
+        {
+            cards.Add(creada);
+            nextX += 30;
+            nextY += 30;
+            StateHasChanged();
+        }
     }
 }
