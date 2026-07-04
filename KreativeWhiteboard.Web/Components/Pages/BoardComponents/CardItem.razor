@@ -1,7 +1,7 @@
 @inject IJSRuntime JS
 
-<div class="absolute rounded-xl shadow-xl group select-none"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: 240px; background: #111827; border: 1px solid #1f2937;"
+<div class="absolute rounded-xl shadow-xl group select-none overflow-hidden"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
      @ref="elementRef">
 
     <!-- Header -->
@@ -29,8 +29,8 @@
         }
         else
         {
-            <p class="text-gray-300 text-sm cursor-text min-h-24 whitespace-pre-wrap leading-relaxed"
-               @onclick="() => OnEdit.InvokeAsync(Card.Id)">
+            <p class="text-gray-300 text-sm cursor-text whitespace-pre-wrap leading-relaxed break-words overflow-auto h-full"
+                @onclick="() => OnEdit.InvokeAsync(Card.Id)">
                 @(string.IsNullOrEmpty(Card.Content) ? "Escribe algo..." : Card.Content)
             </p>
         }
@@ -43,8 +43,8 @@
     [Parameter] public EventCallback<Card> OnDelete { get; set; }
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<Guid> OnEdit { get; set; }
-    [Parameter] public EventCallback<(Guid, int, int)> OnMove { get; set; }
-
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
+    
     private ElementReference elementRef;
     private bool dragInitialized = false;
 
@@ -58,15 +58,30 @@
                 Card.Id,
                 elementRef);
             await JS.InvokeVoidAsync("lucide.createIcons");
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
         }
     }
 
     [JSInvokable]
-    public async Task OnCardMoved(string cardId, int x, int y)
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
     {
-        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y));
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
     }
 
     [JSInvokable]
     public void SetDragging(bool dragging) { }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
+    }
 }

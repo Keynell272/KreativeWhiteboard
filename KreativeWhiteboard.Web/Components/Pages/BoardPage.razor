@@ -24,58 +24,59 @@ else
 {
     <div class="flex h-screen bg-gray-950 overflow-hidden">
 
-        <div class="hidden md:flex">
-            <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
-        </div>
-
         <div class="flex flex-col flex-1 overflow-hidden">
-
-            <!-- Toolbar superior con breadcrumb -->
-            <div class="flex items-center justify-between px-4 py-2.5 bg-gray-900 border-b border-gray-800">
-                <div class="flex items-center gap-2 flex-wrap">
-                    @for (int i = 0; i < breadcrumb.Count; i++)
-                    {
-                        var item = breadcrumb[i];
-                        var isLast = i == breadcrumb.Count - 1;
-
-                        @if (isLast)
-                        {
-                            @if (editandoTituloBoard && board?.ParentCardId == null)
-                            {
-                                <input class="bg-transparent text-white font-semibold text-sm outline-none border-b border-indigo-500"
-                                    @bind="tituloBoard"
-                                    @onblur="GuardarTituloBoard"
-                                    autofocus />
-                            }
-                            else
-                            {
-                                <span class="text-white font-semibold text-sm @(board?.ParentCardId == null ? "cursor-text" : "")"
-                                    @onclick="() => { if (board?.ParentCardId == null) editandoTituloBoard = true; }">
-                                    @item.Title
-                                </span>
-                            }
-                        }
-                        else
-                        {
-                            <a href="/board/@item.Id"
-                            class="text-gray-400 hover:text-white transition-colors text-sm">
-                                @item.Title
-                            </a>
-                            <span class="text-gray-700 text-sm">›</span>
-                        }
-                    }
-                </div>
-                <div class="flex items-center gap-2 text-gray-500 text-xs">
-                    <i data-lucide="users" class="w-4 h-4"></i>
-                    <span class="hidden sm:inline">Solo tú</span>
-                </div>
-            </div>
 
             <!-- Canvas -->
             <div class="relative flex-1 overflow-auto"
-                 style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;">
+                style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;">
 
-                @foreach (var card in cards)
+                <!-- Toolbar superior flotante -->
+                <div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-2xl px-5 py-2 shadow-2xl" style="z-index: 9999;">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        @for (int i = 0; i < breadcrumb.Count; i++)
+                        {
+                            var item = breadcrumb[i];
+                            var isLast = i == breadcrumb.Count - 1;
+
+                            @if (isLast)
+                            {
+                                @if (editandoTituloBoard && board?.ParentCardId == null)
+                                {
+                                    <input class="bg-transparent text-white font-semibold text-sm outline-none border-b border-indigo-500"
+                                        @bind="tituloBoard"
+                                        @onblur="GuardarTituloBoard"
+                                        autofocus />
+                                }
+                                else
+                                {
+                                    <span class="text-white font-semibold text-sm @(board?.ParentCardId == null ? "cursor-text" : "")"
+                                        @onclick="() => { if (board?.ParentCardId == null) editandoTituloBoard = true; }">
+                                        @item.Title
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <a href="/board/@item.Id"
+                                class="text-gray-400 hover:text-white transition-colors text-sm">
+                                    @item.Title
+                                </a>
+                                <span class="text-gray-700 text-sm">›</span>
+                            }
+                        }
+                    </div>
+                    <div class="flex items-center gap-2 text-gray-500 text-xs border-l border-gray-700 pl-3">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">Solo tú</span>
+                    </div>
+                </div>
+
+                <!-- Toolbar lateral flotante -->
+                <div class="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2" style="z-index: 9999;">
+                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
+                </div>
+
+                @foreach (var card in cards.OrderBy(c => c.CreatedAt))
                 {
                     @if (card.Type == CardType.Board)
                     {
@@ -107,8 +108,8 @@ else
                 @if (mostrarMenuBoard)
                 {
                     <div class="fixed inset-0 z-40" @onclick="CerrarMenuBoard"></div>
-                    <div class="fixed z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-36"
-                        style="left: @(menuBoardX)px; top: @(menuBoardY)px;">
+                        <div class="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-36"
+                             style="z-index: 9998; left: @(menuBoardX)px; top: @(menuBoardY)px;">
                         <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
                                 @onclick="AbrirModalBoard">
                             <span>✏️</span> Editar nombre
@@ -127,7 +128,7 @@ else
 
                 @if (mostrarModalBoard)
                 {
-                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" @onclick="CerrarModalBoard">
+                    <div class="fixed inset-0 flex items-center justify-center bg-black/60" style="z-index: 9999;" @onclick="CerrarModalBoard">
                         <div class="bg-gray-900 border border-gray-700 rounded-xl p-6 w-80 shadow-2xl" @onclick:stopPropagation="true">
                             <h3 class="text-white font-semibold mb-4">Editar nombre del board</h3>
                             <input class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-indigo-500 mb-4"
@@ -147,10 +148,6 @@ else
                     </div>
                 }
 
-            </div>
-
-            <div class="flex md:hidden">
-                <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
             </div>
 
         </div>
@@ -260,6 +257,7 @@ else
 
     private async Task AgregarCard()
     {
+        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         var card = new Card
         {
@@ -268,7 +266,8 @@ else
             Title = "Nueva nota",
             Content = "",
             X = nextX,
-            Y = nextY
+            Y = nextY,
+            ZIndex = maxZ
         };
 
         var response = await http.PostAsJsonAsync("api/cards", card);
@@ -285,6 +284,7 @@ else
 
     private async Task AgregarBoard()
     {
+        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
         var http = HttpClientFactory.CreateClient("KreativeApi");
 
         // Crear el board hijo
@@ -309,7 +309,8 @@ else
             LinkedBoardId = boardCreado.Id,
             Content = "",
             X = nextX,
-            Y = nextY
+            Y = nextY,
+            ZIndex = maxZ
         };
 
         var cardResponse = await http.PostAsJsonAsync("api/cards", card);
@@ -343,12 +344,13 @@ else
         }
     }
 
-    private async Task HandleCardMoved((Guid id, int x, int y) args)
+    private async Task HandleCardMoved((Guid id, int x, int y, int zIndex) args)
     {
         var card = cards.FirstOrDefault(c => c.Id == args.id);
         if (card is null) return;
         card.X = args.x;
         card.Y = args.y;
+        card.ZIndex = args.zIndex;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
     }
@@ -390,6 +392,7 @@ else
 
     private async Task AgregarImagen()
     {
+        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         var card = new Card
         {
@@ -398,7 +401,8 @@ else
             Title = "Imagen",
             Content = "",
             X = nextX,
-            Y = nextY
+            Y = nextY,
+            ZIndex = maxZ
         };
 
         var response = await http.PostAsJsonAsync("api/cards", card);

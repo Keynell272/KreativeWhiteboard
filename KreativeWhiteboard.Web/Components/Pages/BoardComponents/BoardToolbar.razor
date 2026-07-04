@@ -1,7 +1,5 @@
 <div class="@ContainerClass">
 
-    <div class="@DividerClass"></div>
-
     <button @onclick="() => OnAddCard.InvokeAsync()" class="@ButtonClass group" title="Agregar nota">
         <i data-lucide="sticky-note" class="@IconClass text-gray-400 group-hover:text-white transition-colors"></i>
         <span class="@LabelClass">Nota</span>
@@ -42,7 +40,7 @@
 
     private string ContainerClass => IsMobile
         ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"
-        : "flex flex-col items-center gap-1 w-16 bg-gray-900 border-r border-gray-800 py-4";
+        : "flex flex-col items-center gap-2 bg-gray-900/90 backdrop-blur rounded-2xl border border-gray-700/50 shadow-2xl py-3 px-1";
 
     private string ButtonClass => IsMobile
         ? "flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg hover:bg-gray-800 transition-colors"

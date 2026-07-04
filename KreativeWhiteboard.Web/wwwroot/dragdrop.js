@@ -1,3 +1,4 @@
+let zCounter = 100;
 window.dragDrop = {
     init: function (dotnet, cardId, element) {
         let isDragging = false;
@@ -9,7 +10,8 @@ window.dragDrop = {
             startY = e.clientY;
             startLeft = parseInt(element.style.left) || 0;
             startTop = parseInt(element.style.top) || 0;
-            element.style.zIndex = 1000;
+            zCounter++;
+            element.style.zIndex = zCounter;  // sube y nunca baja
             e.preventDefault();
 
             function onMouseMove(e) {
@@ -28,13 +30,13 @@ window.dragDrop = {
             function onMouseUp(e) {
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
-                element.style.zIndex = '';
                 if (isDragging) {
                     isDragging = false;
                     dotnet.invokeMethodAsync('SetDragging', false);
                     const newX = parseInt(element.style.left);
                     const newY = parseInt(element.style.top);
-                    dotnet.invokeMethodAsync('OnCardMoved', cardId.toString(), newX, newY);
+                    const newZ = parseInt(element.style.zIndex) || 0;
+                    dotnet.invokeMethodAsync('OnCardMoved', cardId.toString(), newX, newY, newZ);
                 }
             }
 
@@ -130,4 +132,65 @@ window.createImageInput = function (inputId, dotnet) {
 window.triggerImageInput = function (inputId) {
     const input = document.getElementById(inputId);
     if (input) input.click();
+};
+
+window.resizeCard = function (dotnet, cardId, element) {
+    const handle = document.createElement('div');
+    handle.style.cssText = `
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 16px;
+        height: 16px;
+        cursor: se-resize;
+        z-index: 10;
+    `;
+    handle.innerHTML = `<svg width="10" height="10" viewBox="0 0 10 10" style="position:absolute;bottom:3px;right:3px;opacity:0.3">
+        <path d="M9 1L1 9M5 1L1 5M9 5L5 9" stroke="white" stroke-width="1.5"/>
+    </svg>`;
+    element.appendChild(handle);
+
+    let isResizing = false;
+
+    handle.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        zCounter++;
+        element.style.zIndex = zCounter;
+        dotnet.invokeMethodAsync('SetResizing', true);
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startW = element.offsetWidth;
+        const startH = element.offsetHeight;
+
+        function onMouseMove(e) {
+            const newW = Math.max(100, startW + (e.clientX - startX));
+            const newH = Math.max(80, startH + (e.clientY - startY));
+            element.style.width = newW + 'px';
+            element.style.height = newH + 'px';
+            element.style.minHeight = 'unset';
+        }
+
+        function onMouseUp(e) {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+            isResizing = false;
+            dotnet.invokeMethodAsync('SetResizing', false);
+            const newW = parseInt(element.style.width);
+            const newH = parseInt(element.style.height);
+            dotnet.invokeMethodAsync('OnCardResized', cardId.toString(), newW, newH);
+        }
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    });
+
+    // Exponer isResizing para que BoardCard pueda consultarlo
+    element._isResizing = () => isResizing;
+};
+
+window.isCardResizing = function (element) {
+    return element._isResizing ? element._isResizing() : false;
 };

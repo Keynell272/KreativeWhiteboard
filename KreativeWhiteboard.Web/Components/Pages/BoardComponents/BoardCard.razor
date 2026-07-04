@@ -1,7 +1,7 @@
 @inject IJSRuntime JS
 
-<div class="absolute rounded-xl shadow-xl group select-none board-card-element"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: 200px; background: #1e1b4b; border: 1px solid #3730a3;"
+<div class="absolute rounded-xl shadow-xl group select-none"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"     
      @ref="elementRef"
      data-board-card="true"
      @onclick="HandleClick"
@@ -32,7 +32,7 @@
 @code {
     [Parameter] public Card Card { get; set; } = null!;
     [Parameter] public EventCallback<Card> OnDelete { get; set; }
-    [Parameter] public EventCallback<(Guid, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
     [Parameter] public EventCallback<Guid> OnNavigate { get; set; }
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<(Card, double, double)> OnContextMenu { get; set; }
@@ -45,11 +45,12 @@
     private double touchStartX, touchStartY;
     private bool longPressTriggered = false;
     private System.Threading.Timer? longPressTimer;
+    private bool justFinishedResizing = false;
 
-    private void HandleClick(MouseEventArgs e)
+    private async Task HandleClick(MouseEventArgs e)
     {
-        if (!isDragging && !justFinishedDragging)
-            OnNavigate.InvokeAsync(Card.LinkedBoardId ?? Guid.Empty);
+        if (isDragging || justFinishedDragging || justFinishedResizing) return;
+        await OnNavigate.InvokeAsync(Card.LinkedBoardId ?? Guid.Empty);
     }
 
     private void HandleContextMenu(MouseEventArgs e)
@@ -100,9 +101,12 @@
     }
 
     [JSInvokable]
-    public async Task OnCardMoved(string cardId, int x, int y)
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
     {
-        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y));
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -115,6 +119,28 @@
                 Card.Id,
                 elementRef);
             await JS.InvokeVoidAsync("lucide.createIcons");
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
+    }
+
+    [JSInvokable]
+    public void SetResizing(bool resizing)
+    {
+        if (!resizing)
+        {
+            justFinishedResizing = true;
+            Task.Delay(200).ContinueWith(_ => justFinishedResizing = false);
         }
     }
 }

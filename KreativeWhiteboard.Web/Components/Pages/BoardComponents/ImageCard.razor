@@ -1,12 +1,12 @@
 @inject IJSRuntime JS
 @inject IHttpClientFactory HttpClientFactory
 
-<div class="absolute rounded-xl shadow-xl group select-none"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: 240px; background: #111827; border: 1px solid #1f2937;"
+<div class="absolute rounded-xl shadow-xl group select-none overflow-hidden flex flex-col"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
      @ref="elementRef">
 
     <!-- Header -->
-    <div class="flex items-center justify-between px-3 pt-3 pb-1 cursor-grab">
+    <div class="flex items-center justify-between px-3 py-2 cursor-grab flex-shrink-0">
         <div class="flex items-center gap-1.5">
             <i data-lucide="image" class="w-3.5 h-3.5 text-emerald-400"></i>
             <span class="text-emerald-400 text-[10px] font-semibold uppercase tracking-widest">Imagen</span>
@@ -18,19 +18,21 @@
         </button>
     </div>
 
-    <!-- Contenido -->
-    <div class="px-3 pb-3" @onmousedown:stopPropagation="true">
+    <!-- Imagen -->
+    <div class="flex-1 overflow-hidden" @onmousedown:stopPropagation="true">
         @if (string.IsNullOrEmpty(Card.Content))
         {
-            <div class="flex flex-col items-center justify-center h-32 border-2 border-dashed border-gray-700 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
-                @onclick="AbrirSelector">
+            <div class="flex flex-col items-center justify-center h-full border-2 border-dashed border-gray-700 mx-3 mb-3 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
+                @onclick="() => { if (!isDragging && !justFinishedDragging) AbrirSelector(); }">
                 <i data-lucide="upload" class="w-6 h-6 text-gray-600 mb-1"></i>
                 <p class="text-gray-500 text-xs">Click para subir imagen</p>
             </div>
         }
         else
         {
-            <img src="@Card.Content" alt="imagen" class="w-full rounded-lg object-cover max-h-48" />
+            <div class="w-full h-full"
+                 style="background-image: url('@Card.Content'); background-size: cover; background-position: center; background-repeat: no-repeat;">
+            </div>
         }
     </div>
 </div>
@@ -38,49 +40,45 @@
 @code {
     [Parameter] public Card Card { get; set; } = null!;
     [Parameter] public EventCallback<Card> OnDelete { get; set; }
-    [Parameter] public EventCallback<(Guid, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
     [Parameter] public EventCallback<Card> OnSave { get; set; }
 
     private ElementReference elementRef;
     private bool dragInitialized = false;
-    private bool subiendo = false;
     private string inputId => $"img-input-{Card.Id}";
-
-    private async Task ManejarArchivo(ChangeEventArgs e)
-    {
-        subiendo = true;
-        StateHasChanged();
-
-        await JS.InvokeVoidAsync("uploadImageFromInput", inputId, DotNetObjectReference.Create(this));
-    }
+    private bool isDragging = false;
+    private bool justFinishedDragging = false;
 
     [JSInvokable]
     public async Task OnImageUploaded(string url)
     {
         Card.Content = url;
-        subiendo = false;
         await OnSave.InvokeAsync(Card);
         StateHasChanged();
     }
 
     [JSInvokable]
-    public void SetDragging(bool dragging) { }
-
-    [JSInvokable]
-    public async Task OnCardMoved(string cardId, int x, int y)
+    public void SetDragging(bool dragging)
     {
-        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y));
+        isDragging = dragging;
+        if (!dragging)
+        {
+            justFinishedDragging = true;
+            Task.Delay(200).ContinueWith(_ => justFinishedDragging = false);
+        }
     }
 
-    private async Task LimpiarImagen()
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
     {
-        Card.Content = "";
-        await OnSave.InvokeAsync(Card);
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await JS.InvokeVoidAsync("console.log", $"OnAfterRender called, dragInitialized={dragInitialized}, firstRender={firstRender}");
         if (!dragInitialized)
         {
             dragInitialized = true;
@@ -90,11 +88,23 @@
                 elementRef);
             await JS.InvokeVoidAsync("lucide.createIcons");
             await JS.InvokeVoidAsync("createImageInput", inputId, DotNetObjectReference.Create(this));
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
         }
     }
 
     private async Task AbrirSelector()
     {
         await JS.InvokeVoidAsync("triggerImageInput", inputId);
+    }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
     }
 }
