@@ -1,0 +1,188 @@
+@inject IJSRuntime JS
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@implements IAsyncDisposable
+
+<div class="absolute rounded-xl shadow-xl group select-none overflow-hidden flex flex-col"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
+     @ref="elementRef">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-3 py-2 cursor-grab flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+            <i data-lucide="check-square" class="w-3.5 h-3.5 text-violet-400"></i>
+            <span class="text-violet-400 text-[10px] font-semibold uppercase tracking-widest">Lista</span>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                @onclick="() => OnDelete.InvokeAsync(Card)"
+                @onclick:stopPropagation="true">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <!-- Items -->
+    <div class="flex-1 overflow-auto px-3 pb-2" @onmousedown:stopPropagation="true">
+        @foreach (var item in items)
+        {
+            <div class="flex items-center gap-2 py-1 group/item">
+                <input type="checkbox" checked="@item.Completado"
+                       class="w-4 h-4 rounded accent-violet-500 cursor-pointer flex-shrink-0"
+                       @onchange="() => ToggleItem(item)" />
+                @if (item.Editando)
+                {
+                    <input class="flex-1 bg-transparent text-white text-sm outline-none border-b border-violet-500"
+                        value="@item.Texto"
+                        @onblur="() => GuardarItem(item)"
+                        @onkeydown="(e) => HandleItemKeyDown(e, item)"
+                        @oninput="(e) => { item.Texto = e.Value?.ToString() ?? string.Empty; _ = GuardarDebounced(); }"
+                        autofocus />
+                }
+                else
+                {
+                    <span class="flex-1 text-sm cursor-text min-w-8 min-h-5 @(item.Completado ? "line-through text-gray-500" : "text-gray-200")"
+                        @onclick="() => { item.Editando = true; StateHasChanged(); }">
+                        @(string.IsNullOrEmpty(item.Texto) ? "\u00A0" : item.Texto)
+                    </span>
+                }
+                <button class="opacity-0 group-hover/item:opacity-100 transition-opacity text-gray-600 hover:text-red-400 flex-shrink-0"
+                        @onclick="() => EliminarItem(item)">
+                    <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+            </div>
+        }
+
+        <!-- Agregar item -->
+        <button class="flex items-center gap-2 text-gray-600 hover:text-violet-400 transition-colors text-xs mt-1 w-full"
+                @onclick="AgregarItem">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Agregar item</span>
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; } = null!;
+    [Parameter] public EventCallback<Card> OnDelete { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<Card> OnSave { get; set; }
+
+    private ElementReference elementRef;
+    private bool dragInitialized = false;
+    private List<ChecklistItem> items = new();
+
+    private class ChecklistItem
+    {
+        public string Texto { get; set; } = "";
+        public bool Completado { get; set; }
+        [JsonIgnore]
+        public bool Editando { get; set; }
+    }
+
+    private bool itemsCargados = false;
+
+    protected override void OnParametersSet()
+    {
+        if (itemsCargados) return;
+        itemsCargados = true;
+        if (!string.IsNullOrEmpty(Card.Content))
+        {
+            try
+            {
+                items = JsonSerializer.Deserialize<List<ChecklistItem>>(Card.Content) ?? new();
+            }
+            catch { items = new(); }
+        }
+    }
+
+    private async Task ToggleItem(ChecklistItem item)
+    {
+        item.Completado = !item.Completado;
+        await Guardar();
+    }
+
+    private async Task GuardarItem(ChecklistItem item)
+    {
+        item.Editando = false;
+        await Guardar();
+    }
+
+    private async Task HandleItemKeyDown(KeyboardEventArgs e, ChecklistItem item)
+    {
+        if (e.Key == "Enter") await GuardarItem(item);
+        if (e.Key == "Escape") { item.Editando = false; StateHasChanged(); }
+    }
+
+    private async Task AgregarItem()
+    {
+        var nuevoItem = new ChecklistItem { Texto = "", Editando = true };
+        items.Add(nuevoItem);
+        await Guardar();
+    }
+
+    private async Task EliminarItem(ChecklistItem item)
+    {
+        items.Remove(item);
+        await Guardar();
+    }
+
+    private async Task Guardar()
+    {
+        Card.Content = JsonSerializer.Serialize(items);
+        await OnSave.InvokeAsync(Card);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void SetDragging(bool dragging) { }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
+    {
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
+    }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!dragInitialized)
+        {
+            dragInitialized = true;
+            await JS.InvokeVoidAsync("dragDrop.init",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+            await JS.InvokeVoidAsync("lucide.createIcons");
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Guardar();
+    }
+
+    private System.Threading.Timer? debounceTimer;
+
+    private Task GuardarDebounced()
+    {
+        debounceTimer?.Dispose();
+        debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(Guardar);
+        }, null, 500, System.Threading.Timeout.Infinite);
+        return Task.CompletedTask;
+    }
+}

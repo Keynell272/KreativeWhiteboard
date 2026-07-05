@@ -73,7 +73,7 @@ else
 
                 <!-- Toolbar lateral flotante -->
                 <div class="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2" style="z-index: 9999;">
-                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" />
+                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" OnAddChecklist="AgregarChecklist" />
                 </div>
 
                 @foreach (var card in cards.OrderBy(c => c.CreatedAt))
@@ -93,6 +93,13 @@ else
                                 OnDelete="EliminarCard"
                                 OnMove="HandleCardMoved"
                                 OnSave="GuardarCard" />
+                    }
+                    else if (card.Type == CardType.Checklist)
+                    {
+                        <ChecklistCard Card="card"
+                                    OnDelete="EliminarCard"
+                                    OnMove="HandleCardMoved"
+                                    OnSave="GuardarCard" />
                     }
                     else
                     {
@@ -415,4 +422,31 @@ else
             StateHasChanged();
         }
     }
+
+    private async Task AgregarChecklist()
+    {
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
+        var card = new Card
+        {
+            BoardId = Id,
+            Type = CardType.Checklist,
+            Title = "Lista",
+            Content = "[]",
+            X = nextX,
+            Y = nextY,
+            ZIndex = maxZ
+        };
+
+        var response = await http.PostAsJsonAsync("api/cards", card);
+        var creada = await response.Content.ReadFromJsonAsync<Card>();
+        if (creada is not null)
+        {
+            cards.Add(creada);
+            nextX += 30;
+            nextY += 30;
+            StateHasChanged();
+        }
+    }
+
 }

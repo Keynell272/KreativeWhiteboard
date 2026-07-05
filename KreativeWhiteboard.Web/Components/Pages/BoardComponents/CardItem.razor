@@ -22,9 +22,10 @@
         @if (IsEditing)
         {
             <textarea class="w-full bg-transparent text-gray-200 text-sm resize-none outline-none min-h-24 leading-relaxed"
-                      @bind="Card.Content"
-                      @onblur="() => OnSave.InvokeAsync(Card)"
-                      autofocus>
+                    value="@Card.Content"
+                    @onblur="() => OnSave.InvokeAsync(Card)"
+                    @oninput="(e) => { Card.Content = e.Value?.ToString() ?? string.Empty; _ = GuardarDebounced(); }"
+                    autofocus>
             </textarea>
         }
         else
@@ -84,4 +85,17 @@
         Card.Height = height;
         await OnSave.InvokeAsync(Card);
     }
+
+    private System.Threading.Timer? debounceTimer;
+
+    private Task GuardarDebounced()
+    {
+        debounceTimer?.Dispose();
+        debounceTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(() => OnSave.InvokeAsync(Card));
+        }, null, 500, System.Threading.Timeout.Infinite);
+        return Task.CompletedTask;
+    }
+    
 }

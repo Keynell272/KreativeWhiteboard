@@ -15,8 +15,8 @@
         <span class="@LabelClass">Imagen</span>
     </button>
 
-    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
-        <i data-lucide="check-square" class="@IconClass text-gray-400"></i>
+    <button @onclick="() => OnAddChecklist.InvokeAsync()" class="@ButtonClass group" title="Agregar lista">
+        <i data-lucide="check-square" class="@IconClass text-gray-400 group-hover:text-white transition-colors"></i>
         <span class="@LabelClass">Lista</span>
     </button>
 
@@ -37,6 +37,7 @@
     [Parameter] public EventCallback OnAddCard { get; set; }
     [Parameter] public EventCallback OnAddBoard { get; set; }
     [Parameter] public EventCallback OnAddImage { get; set; }
+    [Parameter] public EventCallback OnAddChecklist { get; set; }
 
     private string ContainerClass => IsMobile
         ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"
