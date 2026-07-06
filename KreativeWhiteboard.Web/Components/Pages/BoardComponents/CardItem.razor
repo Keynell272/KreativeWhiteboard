@@ -1,4 +1,5 @@
 @inject IJSRuntime JS
+@inject IHttpClientFactory HttpClientFactory
 
 <div class="absolute rounded-xl shadow-xl group select-none overflow-hidden"
      style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
@@ -93,8 +94,9 @@
         debounceTimer?.Dispose();
         debounceTimer = new System.Threading.Timer(async _ =>
         {
-            await InvokeAsync(() => OnSave.InvokeAsync(Card));
-        }, null, 500, System.Threading.Timeout.Infinite);
+            var http = HttpClientFactory.CreateClient("KreativeApi");
+            await http.PutAsJsonAsync($"api/cards/{Card.Id}", Card);
+        }, null, 800, System.Threading.Timeout.Infinite);
         return Task.CompletedTask;
     }
     

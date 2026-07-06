@@ -28,7 +28,8 @@ else
 
             <!-- Canvas -->
             <div class="relative flex-1 overflow-auto"
-                style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;">
+                style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;"
+                @ref="canvasRef">
 
                 <!-- Toolbar superior flotante -->
                 <div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-2xl px-5 py-2 shadow-2xl" style="z-index: 9999;">
@@ -73,7 +74,7 @@ else
 
                 <!-- Toolbar lateral flotante -->
                 <div class="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2" style="z-index: 9999;">
-                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" OnAddChecklist="AgregarChecklist" />
+                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" OnAddChecklist="AgregarChecklist" OnAddLink="AgregarLink" />
                 </div>
 
                 @foreach (var card in cards.OrderBy(c => c.CreatedAt))
@@ -100,6 +101,13 @@ else
                                     OnDelete="EliminarCard"
                                     OnMove="HandleCardMoved"
                                     OnSave="GuardarCard" />
+                    }
+                    else if (card.Type == CardType.Link)
+                    {
+                        <LinkCard Card="card"
+                                OnDelete="EliminarCard"
+                                OnMove="HandleCardMoved"
+                                OnSave="GuardarCard" />
                     }
                     else
                     {
@@ -264,7 +272,7 @@ else
 
     private async Task AgregarCard()
     {
-        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
+        var (x, y, z) = await GetNewCardPosition();
         var http = HttpClientFactory.CreateClient("KreativeApi");
         var card = new Card
         {
@@ -272,9 +280,9 @@ else
             Type = CardType.Note,
             Title = "Nueva nota",
             Content = "",
-            X = nextX,
-            Y = nextY,
-            ZIndex = maxZ
+            X = x,
+            Y = y,
+            ZIndex = z
         };
 
         var response = await http.PostAsJsonAsync("api/cards", card);
@@ -282,8 +290,6 @@ else
         if (creada is not null)
         {
             cards.Add(creada);
-            nextX += 30;
-            nextY += 30;
             cardEditandoId = creada.Id;
             StateHasChanged();
         }
@@ -291,10 +297,9 @@ else
 
     private async Task AgregarBoard()
     {
-        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
+        var (x, y, z) = await GetNewCardPosition();
         var http = HttpClientFactory.CreateClient("KreativeApi");
 
-        // Crear el board hijo
         var nuevoBoard = new Board
         {
             Title = "Nuevo Board",
@@ -307,7 +312,6 @@ else
         var boardCreado = await boardResponse.Content.ReadFromJsonAsync<Board>();
         if (boardCreado is null) return;
 
-        // Crear la card que representa ese board
         var card = new Card
         {
             BoardId = Id,
@@ -315,22 +319,19 @@ else
             Title = boardCreado.Title,
             LinkedBoardId = boardCreado.Id,
             Content = "",
-            X = nextX,
-            Y = nextY,
-            ZIndex = maxZ
+            X = x,
+            Y = y,
+            ZIndex = z
         };
 
         var cardResponse = await http.PostAsJsonAsync("api/cards", card);
         var cardCreada = await cardResponse.Content.ReadFromJsonAsync<Card>();
         if (cardCreada is null) return;
 
-        // Actualizar el board hijo con el ParentCardId
         boardCreado.ParentCardId = cardCreada.Id;
         await http.PutAsJsonAsync($"api/boards/{boardCreado.Id}", boardCreado);
 
         cards.Add(cardCreada);
-        nextX += 30;
-        nextY += 30;
         StateHasChanged();
     }
 
@@ -399,7 +400,7 @@ else
 
     private async Task AgregarImagen()
     {
-        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
+        var (x, y, z) = await GetNewCardPosition();
         var http = HttpClientFactory.CreateClient("KreativeApi");
         var card = new Card
         {
@@ -407,9 +408,9 @@ else
             Type = CardType.Image,
             Title = "Imagen",
             Content = "",
-            X = nextX,
-            Y = nextY,
-            ZIndex = maxZ
+            X = x,
+            Y = y,
+            ZIndex = z
         };
 
         var response = await http.PostAsJsonAsync("api/cards", card);
@@ -417,25 +418,23 @@ else
         if (creada is not null)
         {
             cards.Add(creada);
-            nextX += 30;
-            nextY += 30;
             StateHasChanged();
         }
     }
 
     private async Task AgregarChecklist()
     {
+        var (x, y, z) = await GetNewCardPosition();
         var http = HttpClientFactory.CreateClient("KreativeApi");
-        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
         var card = new Card
         {
             BoardId = Id,
             Type = CardType.Checklist,
             Title = "Lista",
             Content = "[]",
-            X = nextX,
-            Y = nextY,
-            ZIndex = maxZ
+            X = x,
+            Y = y,
+            ZIndex = z
         };
 
         var response = await http.PostAsJsonAsync("api/cards", card);
@@ -443,10 +442,57 @@ else
         if (creada is not null)
         {
             cards.Add(creada);
-            nextX += 30;
-            nextY += 30;
             StateHasChanged();
         }
     }
 
+    private async Task AgregarLink()
+    {
+        var (x, y, z) = await GetNewCardPosition();
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        var card = new Card
+        {
+            BoardId = Id,
+            Type = CardType.Link,
+            Title = "Link",
+            Content = "",
+            X = x,
+            Y = y,
+            ZIndex = z
+        };
+
+        var response = await http.PostAsJsonAsync("api/cards", card);
+        var creada = await response.Content.ReadFromJsonAsync<Card>();
+        if (creada is not null)
+        {
+            cards.Add(creada);
+            StateHasChanged();
+        }
+    }
+
+
+    private ElementReference canvasRef;
+
+    private async Task<(int x, int y, int z)> GetNewCardPosition()
+    {
+        var maxZ = cards.Any() ? cards.Max(c => c.ZIndex) + 1 : 1;
+        
+        // Obtener dimensiones del canvas via JS
+        var rect = await JS.InvokeAsync<BoundingRect>("getBoundingRect", canvasRef);
+        var x = (int)(rect.Width / 2) - 100 + (new Random().Next(-30, 30));
+        var y = (int)(rect.Height / 2) - 100 + (new Random().Next(-30, 30));
+        
+        return (x, y, maxZ);
+    }
+
+    private class BoundingRect
+    {
+        public double Width { get; set; }
+        public double Height { get; set; }
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public double ScrollLeft { get; set; }
+        public double ScrollTop { get; set; }
+    }
+    
 }

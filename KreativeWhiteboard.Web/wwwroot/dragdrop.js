@@ -194,3 +194,14 @@ window.resizeCard = function (dotnet, cardId, element) {
 window.isCardResizing = function (element) {
     return element._isResizing ? element._isResizing() : false;
 };
+window.getBoundingRect = function(element) {
+    const rect = element.getBoundingClientRect();
+    return {
+        width: element.clientWidth,
+        height: element.clientHeight,
+        left: rect.left,
+        top: rect.top,
+        scrollLeft: element.scrollLeft,
+        scrollTop: element.scrollTop
+    };
+};

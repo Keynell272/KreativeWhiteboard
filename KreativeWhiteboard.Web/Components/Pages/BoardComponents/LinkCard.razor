@@ -1,0 +1,171 @@
+@inject IJSRuntime JS
+@inject IHttpClientFactory HttpClientFactory
+
+<div class="absolute rounded-xl shadow-xl group select-none overflow-hidden flex flex-col"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
+     @ref="elementRef">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-3 py-2 cursor-grab flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+            <i data-lucide="link" class="w-3.5 h-3.5 text-sky-400"></i>
+            <span class="text-sky-400 text-[10px] font-semibold uppercase tracking-widest">Link</span>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                @onclick="() => OnDelete.InvokeAsync(Card)"
+                @onclick:stopPropagation="true">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <!-- Contenido -->
+    <div class="flex-1 overflow-hidden px-3 pb-3" @onmousedown:stopPropagation="true">
+        @if (string.IsNullOrEmpty(preview?.Url))
+        {
+            <div class="flex flex-col gap-2">
+                <input class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-sky-500"
+                       placeholder="Pega una URL..."
+                       @bind="urlInput"
+                       @onkeydown="HandleKeyDown" />
+                <button class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs rounded-lg transition-colors"
+                        @onclick="CargarPreview">
+                    Cargar preview
+                </button>
+            </div>
+        }
+        else
+        {
+            <a href="@preview.Url" target="_blank" 
+                    class="flex flex-col gap-2 cursor-pointer"
+                    @onclick:preventDefault="isDragging || justFinishedDragging">
+                
+                @if (!string.IsNullOrEmpty(preview.Image))
+                {
+                    <img src="@preview.Image" alt="preview" class="w-full rounded-lg object-cover max-h-32" />
+                }
+                <div>
+                    <p class="text-white text-sm font-medium leading-tight">@preview.Title</p>
+                    @if (!string.IsNullOrEmpty(preview.Description))
+                    {
+                        <p class="text-gray-500 text-xs mt-1 line-clamp-2">@preview.Description</p>
+                    }
+                    <p class="text-sky-500 text-xs mt-1 truncate">@preview.Url</p>
+                </div>
+            </a>
+            <button class="mt-2 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                    @onclick="LimpiarPreview">
+                Cambiar URL
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; } = null!;
+    [Parameter] public EventCallback<Card> OnDelete { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<Card> OnSave { get; set; }
+
+    private ElementReference elementRef;
+    private bool dragInitialized = false;
+    private string urlInput = "";
+    private PreviewData? preview;
+
+    private class PreviewData
+    {
+        public string Url { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string Image { get; set; } = "";
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (dragInitialized) return;
+        if (!string.IsNullOrEmpty(Card.Content))
+        {
+            try
+            {
+                preview = System.Text.Json.JsonSerializer.Deserialize<PreviewData>(Card.Content);
+            }
+            catch { preview = null; }
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await CargarPreview();
+    }
+
+    private async Task CargarPreview()
+    {
+        if (string.IsNullOrWhiteSpace(urlInput)) return;
+        if (!urlInput.StartsWith("http")) urlInput = "https://" + urlInput;
+
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        var result = await http.GetFromJsonAsync<PreviewData>($"api/preview?url={Uri.EscapeDataString(urlInput)}");
+        if (result is not null)
+        {
+            preview = result;
+            Card.Content = System.Text.Json.JsonSerializer.Serialize(preview);
+            await OnSave.InvokeAsync(Card);
+            StateHasChanged();
+        }
+    }
+
+    private async Task LimpiarPreview()
+    {
+        preview = null;
+        urlInput = "";
+        Card.Content = "";
+        await OnSave.InvokeAsync(Card);
+    }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
+    {
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
+    }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!dragInitialized)
+        {
+            dragInitialized = true;
+            await JS.InvokeVoidAsync("dragDrop.init",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+            await JS.InvokeVoidAsync("lucide.createIcons");
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+        }
+    }
+
+    private bool isDragging = false;
+    private bool justFinishedDragging = false;
+
+    [JSInvokable]
+    public void SetDragging(bool dragging)
+    {
+        isDragging = dragging;
+        if (!dragging)
+        {
+            justFinishedDragging = true;
+            Task.Delay(200).ContinueWith(_ => justFinishedDragging = false);
+        }
+    }
+}

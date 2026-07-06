@@ -20,8 +20,8 @@
         <span class="@LabelClass">Lista</span>
     </button>
 
-    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
-        <i data-lucide="link" class="@IconClass text-gray-400"></i>
+    <button @onclick="() => OnAddLink.InvokeAsync()" class="@ButtonClass group" title="Agregar link">
+        <i data-lucide="link" class="@IconClass text-gray-400 group-hover:text-white transition-colors"></i>
         <span class="@LabelClass">Link</span>
     </button>
 
@@ -38,6 +38,7 @@
     [Parameter] public EventCallback OnAddBoard { get; set; }
     [Parameter] public EventCallback OnAddImage { get; set; }
     [Parameter] public EventCallback OnAddChecklist { get; set; }
+    [Parameter] public EventCallback OnAddLink { get; set; }
 
     private string ContainerClass => IsMobile
         ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"
