@@ -25,6 +25,11 @@
         <span class="@LabelClass">Link</span>
     </button>
 
+    <button @onclick="() => OnAddCountdown.InvokeAsync()" class="@ButtonClass group" title="Countdown">
+        <i data-lucide="timer" class="@IconClass text-gray-400 group-hover:text-white transition-colors"></i>
+        <span class="@LabelClass">Timer</span>
+    </button>
+
     <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
         <i data-lucide="spline" class="@IconClass text-gray-400"></i>
         <span class="@LabelClass">Conector</span>
@@ -39,7 +44,8 @@
     [Parameter] public EventCallback OnAddImage { get; set; }
     [Parameter] public EventCallback OnAddChecklist { get; set; }
     [Parameter] public EventCallback OnAddLink { get; set; }
-
+    [Parameter] public EventCallback OnAddCountdown { get; set; }
+    
     private string ContainerClass => IsMobile
         ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"
         : "flex flex-col items-center gap-2 bg-gray-900/90 backdrop-blur rounded-2xl border border-gray-700/50 shadow-2xl py-3 px-1";

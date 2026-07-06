@@ -1,0 +1,228 @@
+@inject IJSRuntime JS
+@using System.Text.Json
+@implements IDisposable
+
+<div class="absolute rounded-xl shadow-xl group select-none overflow-hidden flex flex-col"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
+     @ref="elementRef">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-3 py-2 cursor-grab flex-shrink-0">
+        <div class="flex items-center gap-1.5">
+            <i data-lucide="timer" class="w-3.5 h-3.5 text-orange-400"></i>
+            <span class="text-orange-400 text-[10px] font-semibold uppercase tracking-widest">Countdown</span>
+        </div>
+        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
+                @onclick="() => OnDelete.InvokeAsync(Card)"
+                @onclick:stopPropagation="true">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+
+    <!-- Contenido -->
+    <div class="flex-1 flex flex-col items-center justify-center px-3 pb-3" @onmousedown:stopPropagation="true">
+        @if (data is null || data.FechaObjetivo == default)
+        {
+            <div class="flex flex-col gap-2 w-full">
+                <input type="text" placeholder="Nombre del evento"
+                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-orange-500"
+                       @bind="nombreInput" />
+                <input type="datetime-local"
+                       class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-orange-500"
+                       @bind="fechaInput" />
+                <button class="px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs rounded-lg transition-colors"
+                        @onclick="Guardar">
+                    Crear countdown
+                </button>
+            </div>
+        }
+        else if (transcurrido)
+        {
+            <p class="text-orange-400 font-bold text-lg">🎉 @data.Nombre</p>
+            <p class="text-gray-500 text-xs mt-1">Hace:</p>
+            <div class="flex gap-3 mt-2">
+                <div class="flex flex-col items-center">
+                    <span class="text-gray-400 text-xl font-bold tabular-nums">@diasPost.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">días</span>
+                </div>
+                <span class="text-gray-600 text-lg font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-gray-400 text-xl font-bold tabular-nums">@horasPost.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">horas</span>
+                </div>
+                <span class="text-gray-600 text-lg font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-gray-400 text-xl font-bold tabular-nums">@minutosPost.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">min</span>
+                </div>
+                <span class="text-gray-600 text-lg font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-orange-400 text-xl font-bold tabular-nums">@segundosPost.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">seg</span>
+                </div>
+            </div>
+            <button class="mt-3 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                    @onclick="Reiniciar">
+                Cambiar fecha
+            </button>
+        }
+        else
+        {
+            <p class="text-gray-400 text-xs mb-3">@data.Nombre</p>
+            <div class="flex gap-3">
+                <div class="flex flex-col items-center">
+                    <span class="text-white text-2xl font-bold tabular-nums">@dias.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">días</span>
+                </div>
+                <span class="text-gray-600 text-xl font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-white text-2xl font-bold tabular-nums">@horas.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">horas</span>
+                </div>
+                <span class="text-gray-600 text-xl font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-white text-2xl font-bold tabular-nums">@minutos.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">min</span>
+                </div>
+                <span class="text-gray-600 text-xl font-bold">:</span>
+                <div class="flex flex-col items-center">
+                    <span class="text-orange-400 text-2xl font-bold tabular-nums">@segundos.ToString("D2")</span>
+                    <span class="text-gray-600 text-[10px]">seg</span>
+                </div>
+            </div>
+            <button class="mt-3 text-xs text-gray-600 hover:text-gray-400 transition-colors"
+                    @onclick="Reiniciar">
+                Cambiar fecha
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Card Card { get; set; } = null!;
+    [Parameter] public EventCallback<Card> OnDelete { get; set; }
+    [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
+    [Parameter] public EventCallback<Card> OnSave { get; set; }
+
+    private ElementReference elementRef;
+    private bool dragInitialized = false;
+
+    private string nombreInput = "";
+    private DateTime fechaInput = DateTime.Now.AddDays(7);
+
+    private int dias, horas, minutos, segundos;
+    private bool transcurrido = false;
+    private System.Threading.Timer? timer;
+
+    private class CountdownData
+    {
+        public string Nombre { get; set; } = "";
+        public DateTime FechaObjetivo { get; set; }
+    }
+
+    private CountdownData? data;
+
+    protected override void OnParametersSet()
+    {
+        if (dragInitialized) return;
+        if (!string.IsNullOrEmpty(Card.Content))
+        {
+            try
+            {
+                data = JsonSerializer.Deserialize<CountdownData>(Card.Content);
+                if (data is not null) IniciarTimer();
+            }
+            catch { data = null; }
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (string.IsNullOrWhiteSpace(nombreInput)) return;
+        data = new CountdownData { Nombre = nombreInput, FechaObjetivo = fechaInput };
+        Card.Content = JsonSerializer.Serialize(data);
+        await OnSave.InvokeAsync(Card);
+        IniciarTimer();
+        StateHasChanged();
+    }
+
+    private async Task Reiniciar()
+    {
+        data = null;
+        transcurrido = false;
+        timer?.Dispose();
+        Card.Content = "";
+        await OnSave.InvokeAsync(Card);
+    }
+
+    public void Dispose() => timer?.Dispose();
+
+    [JSInvokable]
+    public void SetDragging(bool dragging) { }
+
+    [JSInvokable]
+    public async Task OnCardMoved(string cardId, int x, int y, int zIndex)
+    {
+        Card.X = x;
+        Card.Y = y;
+        Card.ZIndex = zIndex;
+        await OnMove.InvokeAsync((Guid.Parse(cardId), x, y, zIndex));
+    }
+
+    [JSInvokable]
+    public async Task OnCardResized(string cardId, int width, int height)
+    {
+        Card.Width = width;
+        Card.Height = height;
+        await OnSave.InvokeAsync(Card);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!dragInitialized)
+        {
+            dragInitialized = true;
+            await JS.InvokeVoidAsync("dragDrop.init",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+            await JS.InvokeVoidAsync("lucide.createIcons");
+            await JS.InvokeVoidAsync("resizeCard",
+                DotNetObjectReference.Create(this),
+                Card.Id,
+                elementRef);
+        }
+    }
+
+    private int diasPost, horasPost, minutosPost, segundosPost;
+
+    private void ActualizarTiempo()
+    {
+        if (data is null) return;
+        var diff = data.FechaObjetivo - DateTime.Now;
+        if (diff.TotalSeconds <= 0)
+        {
+            transcurrido = true;
+            var diffPost = DateTime.Now - data.FechaObjetivo;
+            diasPost = (int)diffPost.TotalDays;
+            horasPost = diffPost.Hours;
+            minutosPost = diffPost.Minutes;
+            segundosPost = diffPost.Seconds;
+            return;
+        }
+        dias = (int)diff.TotalDays;
+        horas = diff.Hours;
+        minutos = diff.Minutes;
+        segundos = diff.Seconds;
+    }
+
+    private void IniciarTimer()
+    {
+        timer?.Dispose();
+        timer = new System.Threading.Timer(_ =>
+        {
+            ActualizarTiempo();
+            InvokeAsync(StateHasChanged);
+        }, null, 0, 1000);
+    }
+}
