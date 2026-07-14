@@ -57,3 +57,11 @@ VALUES ('20260617004122_InitialCreate', '10.0.9');
 
 COMMIT;
 
+START TRANSACTION;
+ALTER TABLE "Cards" ADD "ZIndex" integer NOT NULL DEFAULT 0;
+
+INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+VALUES ('20260704164936_AddZIndexToCard', '10.0.9');
+
+COMMIT;
+

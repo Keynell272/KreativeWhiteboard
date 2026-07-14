@@ -27,7 +27,7 @@ else
         <div class="flex flex-col flex-1 overflow-hidden">
 
             <!-- Canvas -->
-            <div class="relative flex-1 overflow-auto"
+            <div class="relative flex-1 overflow-auto canvas-bg"
                 style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;"
                 @ref="canvasRef">
 
@@ -82,6 +82,7 @@ else
                     @if (card.Type == CardType.Board)
                     {
                         <BoardCard Card="card"
+                            IsSelected="seleccionados.Contains(card.Id)"
                             OnDelete="EliminarCard"
                             OnMove="HandleCardMoved"
                             OnNavigate="Navegar"
@@ -91,6 +92,7 @@ else
                     else if (card.Type == CardType.Image)
                     {
                         <ImageCard Card="card"
+                                IsSelected="seleccionados.Contains(card.Id)"
                                 OnDelete="EliminarCard"
                                 OnMove="HandleCardMoved"
                                 OnSave="GuardarCard" />
@@ -98,6 +100,7 @@ else
                     else if (card.Type == CardType.Checklist)
                     {
                         <ChecklistCard Card="card"
+                                    IsSelected="seleccionados.Contains(card.Id)"
                                     OnDelete="EliminarCard"
                                     OnMove="HandleCardMoved"
                                     OnSave="GuardarCard" />
@@ -105,6 +108,7 @@ else
                     else if (card.Type == CardType.Link)
                     {
                         <LinkCard Card="card"
+                                IsSelected="seleccionados.Contains(card.Id)"
                                 OnDelete="EliminarCard"
                                 OnMove="HandleCardMoved"
                                 OnSave="GuardarCard" />
@@ -112,6 +116,7 @@ else
                     else if (card.Type == CardType.Countdown)
                     {
                         <CountdownCard Card="card"
+                            IsSelected="seleccionados.Contains(card.Id)"
                             OnDelete="EliminarCard"
                             OnMove="HandleCardMoved"
                             OnSave="GuardarCard" />
@@ -120,6 +125,7 @@ else
                     {
                         <CardItem Card="card"
                                 IsEditing="cardEditandoId == card.Id"
+                                IsSelected="seleccionados.Contains(card.Id)"
                                 OnDelete="EliminarCard"
                                 OnSave="GuardarCard"
                                 OnEdit="(id) => { cardEditandoId = id; }"
@@ -129,9 +135,8 @@ else
 
                 @if (mostrarMenuBoard)
                 {
-                    <div class="fixed inset-0 z-40" @onclick="CerrarMenuBoard"></div>
-                        <div class="fixed bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-36"
-                             style="z-index: 9998; left: @(menuBoardX)px; top: @(menuBoardY)px;">
+                    <div class="fixed board-context-menu bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 min-w-36"
+                        style="z-index: 9998; left: @(menuBoardX)px; top: @(menuBoardY)px;">
                         <button class="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700 transition-colors"
                                 @onclick="AbrirModalBoard">
                             <span>✏️</span> Editar nombre
@@ -200,6 +205,7 @@ else
         tituloEditadoBoard = cardMenuActual?.Title ?? "";
         mostrarMenuBoard = false;
         mostrarModalBoard = true;
+        StateHasChanged();
     }
 
     private void CerrarModalBoard() => mostrarModalBoard = false;
@@ -359,17 +365,6 @@ else
         }
     }
 
-    private async Task HandleCardMoved((Guid id, int x, int y, int zIndex) args)
-    {
-        var card = cards.FirstOrDefault(c => c.Id == args.id);
-        if (card is null) return;
-        card.X = args.x;
-        card.Y = args.y;
-        card.ZIndex = args.zIndex;
-        var http = HttpClientFactory.CreateClient("KreativeApi");
-        await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
-    }
-
     private async Task EliminarCard(Card card)
     {
         var http = HttpClientFactory.CreateClient("KreativeApi");
@@ -392,9 +387,21 @@ else
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
+    {   
         if (firstRender)
+        {
             await JS.InvokeVoidAsync("preventContextMenu", DotNetObjectReference.Create(this));
+            await JS.InvokeVoidAsync("initSelection", DotNetObjectReference.Create(this));
+            await JS.InvokeVoidAsync("setBoardDotNet", DotNetObjectReference.Create(this));
+            await JS.InvokeVoidAsync("initKeyboard", DotNetObjectReference.Create(this));
+            
+            if (cards.Any())
+            {
+                var maxZ = cards.Max(c => c.ZIndex);
+                Console.WriteLine($"setZCounter: {maxZ}");
+                await JS.InvokeVoidAsync("setZCounter", maxZ);
+            }
+        }
         await JS.InvokeVoidAsync("lucide.createIcons");
     }
 
@@ -525,4 +532,81 @@ else
             StateHasChanged();
         }
     }   
+
+    private HashSet<Guid> seleccionados = new();
+
+    [JSInvokable]
+    public async Task LimpiarSeleccion()
+    {
+        seleccionados.Clear();
+        await JS.InvokeVoidAsync("setSelectedCards", Array.Empty<string>());
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task SetSeleccion(List<string> ids)
+    {
+        seleccionados = ids.Select(Guid.Parse).ToHashSet();
+        await JS.InvokeVoidAsync("setSelectedCards", ids);
+        StateHasChanged();
+    }
+
+    private async Task HandleCardMoved((Guid id, int x, int y, int zIndex) args)
+    {
+        var card = cards.FirstOrDefault(c => c.Id == args.id);
+        if (card is null) return;
+
+        var dx = args.x - (int)card.X;
+        var dy = args.y - (int)card.Y;
+
+        card.X = args.x;
+        card.Y = args.y;
+        card.ZIndex = args.zIndex;
+
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+
+        // Mover las demás cards seleccionadas
+        if (seleccionados.Contains(card.Id) && seleccionados.Count > 1)
+        {
+            foreach (var selectedId in seleccionados.Where(id => id != card.Id))
+            {
+                var selectedCard = cards.FirstOrDefault(c => c.Id == selectedId);
+                if (selectedCard is null) continue;
+                selectedCard.X += dx;
+                selectedCard.Y += dy;
+                await http.PutAsJsonAsync($"api/cards/{selectedCard.Id}", selectedCard);
+            }
+        }
+    }
+    
+    [JSInvokable]
+    public async Task EliminarSeleccionados()
+    {
+        if (seleccionados.Count == 0) return;
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        foreach (var id in seleccionados.ToList())
+        {
+            var card = cards.FirstOrDefault(c => c.Id == id);
+            if (card is null) continue;
+            await http.DeleteAsync($"api/cards/{card.Id}");
+            cards.Remove(card);
+        }
+        seleccionados.Clear();
+        await JS.InvokeVoidAsync("setSelectedCards", Array.Empty<string>());
+        StateHasChanged();
+    }
+    
+    [JSInvokable]
+    public async Task OnGroupCardMoved(string cardId, int x, int y, int zIndex)
+    {
+        var card = cards.FirstOrDefault(c => c.Id == Guid.Parse(cardId));
+        if (card is null) return;
+        card.X = x;
+        card.Y = y;
+        card.ZIndex = zIndex;
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+    }
+    
 }

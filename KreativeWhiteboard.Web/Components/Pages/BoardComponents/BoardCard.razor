@@ -1,9 +1,10 @@
 @inject IJSRuntime JS
 
 <div class="absolute rounded-xl shadow-xl group select-none"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"     
-     @ref="elementRef"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid @(IsSelected ? "#6366f1" : "#1f2937"); @(IsSelected ? "box-shadow: 0 0 0 2px #6366f1, 0 0 16px 2px rgba(99,102,241,0.4);" : "")"         
      data-board-card="true"
+     id="card-@Card.Id"
+     @ref="elementRef"
      @onclick="HandleClick"
      @oncontextmenu="HandleContextMenu"
      @oncontextmenu:preventDefault="true"
@@ -36,6 +37,7 @@
     [Parameter] public EventCallback<Guid> OnNavigate { get; set; }
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<(Card, double, double)> OnContextMenu { get; set; }
+    [Parameter] public bool IsSelected { get; set; }
 
     private ElementReference elementRef;
     private bool dragInitialized = false;

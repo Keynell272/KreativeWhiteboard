@@ -2,7 +2,8 @@
 @inject IHttpClientFactory HttpClientFactory
 
 <div class="absolute rounded-xl shadow-xl group select-none overflow-hidden"
-     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid #1f2937;"
+     style="left: @(Card.X)px; top: @(Card.Y)px; width: @(Card.Width)px; height: @(Card.Height)px; z-index: @(Card.ZIndex); background: #111827; border: 1px solid @(IsSelected ? "#6366f1" : "#1f2937"); @(IsSelected ? "box-shadow: 0 0 0 2px #6366f1, 0 0 16px 2px rgba(99,102,241,0.4);" : "")"
+     id="card-@Card.Id"
      @ref="elementRef">
 
     <!-- Header -->
@@ -12,17 +13,17 @@
             <span class="text-indigo-400 text-[10px] font-semibold uppercase tracking-widest">Nota</span>
         </div>
         <button class="opacity-0 group-hover:opacity-100 transition-opacity text-gray-600 hover:text-red-400"
-                @onclick="() => OnDelete.InvokeAsync(Card)"
-                @onclick:stopPropagation="true">
+            @onclick="EliminarCard"
+            @onclick:stopPropagation="true">
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
         </button>
     </div>
 
-    <!-- Contenido -->
-    <div class="px-3 pb-3">
+        <!-- Contenido -->
+    <div class="px-3 pb-3 flex flex-col" style="height: calc(100% - 36px);">
         @if (IsEditing)
         {
-            <textarea class="w-full bg-transparent text-gray-200 text-sm resize-none outline-none min-h-24 leading-relaxed"
+            <textarea class="w-full h-full bg-transparent text-gray-200 text-sm resize-none outline-none leading-relaxed overflow-y-auto custom-scroll"
                     value="@Card.Content"
                     @onblur="() => OnSave.InvokeAsync(Card)"
                     @oninput="(e) => { Card.Content = e.Value?.ToString() ?? string.Empty; _ = GuardarDebounced(); }"
@@ -31,12 +32,13 @@
         }
         else
         {
-            <p class="text-gray-300 text-sm cursor-text whitespace-pre-wrap leading-relaxed break-words overflow-auto h-full"
+            <p class="w-full h-full text-gray-300 text-sm cursor-text whitespace-pre-wrap leading-relaxed break-words overflow-y-auto custom-scroll"
                 @onclick="() => OnEdit.InvokeAsync(Card.Id)">
                 @(string.IsNullOrEmpty(Card.Content) ? "Escribe algo..." : Card.Content)
             </p>
         }
     </div>
+
 </div>
 
 @code {
@@ -46,7 +48,8 @@
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<Guid> OnEdit { get; set; }
     [Parameter] public EventCallback<(Guid, int, int, int)> OnMove { get; set; }
-    
+    [Parameter] public bool IsSelected { get; set; }
+
     private ElementReference elementRef;
     private bool dragInitialized = false;
 
@@ -99,5 +102,12 @@
         }, null, 800, System.Threading.Timeout.Infinite);
         return Task.CompletedTask;
     }
-    
+    private async Task EliminarCard()
+    {
+        Console.WriteLine($"Eliminando card {Card.Id}");
+        await OnDelete.InvokeAsync(Card);
+    }
+
+    [JSInvokable]
+    public void SetResizing(bool resizing) { }
 }
