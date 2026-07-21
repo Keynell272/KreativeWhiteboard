@@ -30,8 +30,10 @@
         <span class="@LabelClass">Timer</span>
     </button>
 
-    <button class="@ButtonClass opacity-40 cursor-not-allowed" title="Próximamente">
-        <i data-lucide="spline" class="@IconClass text-gray-400"></i>
+    <button @onclick="() => OnAddConnector.InvokeAsync()" 
+            class="@ButtonClass group @(IsConnectorMode ? "bg-indigo-900" : "")" 
+            title="Modo conector">
+        <i data-lucide="spline" class="@IconClass @(IsConnectorMode ? "text-indigo-400" : "text-gray-400") group-hover:text-white transition-colors"></i>
         <span class="@LabelClass">Conector</span>
     </button>
 
@@ -45,6 +47,8 @@
     [Parameter] public EventCallback OnAddChecklist { get; set; }
     [Parameter] public EventCallback OnAddLink { get; set; }
     [Parameter] public EventCallback OnAddCountdown { get; set; }
+    [Parameter] public EventCallback OnAddConnector { get; set; }
+    [Parameter] public bool IsConnectorMode { get; set; }
     
     private string ContainerClass => IsMobile
         ? "flex flex-row items-center justify-around w-full h-16 bg-gray-900 border-t border-gray-800 px-2"

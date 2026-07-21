@@ -10,15 +10,21 @@ window.setBoardDotNet = function(dotnet) {
     boardDotNet = dotnet;
 };
 
+window.setZCounter = function(value) {
+    console.log('setZCounter called with:', value);
+    zCounter = value;
+};
+
 window.dragDrop = {
     init: function (dotnet, cardId, element) {
         let isDragging = false;
         let startX, startY, startLeft, startTop;
 
         element.addEventListener('mousedown', function (e) {
-            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-            if (e.target.closest('button')) return;  
+            if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+            if (e.target.closest('button')) return;
             if (boardDotNet) boardDotNet.invokeMethodAsync('CerrarMenuDesdeJS');
+
             startX = e.clientX;
             startY = e.clientY;
             startLeft = parseInt(element.style.left) || 0;
@@ -58,9 +64,7 @@ window.dragDrop = {
                         s.el.style.left = (s.startLeft + dx) + 'px';
                         s.el.style.top = (s.startTop + dy) + 'px';
                     });
-                    if (selectedElements.length > 0 && boardDotNet) {
-                        boardDotNet.invokeMethodAsync('LimpiarSeleccion');
-                    }
+                    window.updateConnectors();
                 }
             }
 
@@ -83,6 +87,7 @@ window.dragDrop = {
                             const y = parseInt(s.el.style.top);
                             boardDotNet.invokeMethodAsync('OnGroupCardMoved', id, x, y, zCounter);
                         });
+                        boardDotNet.invokeMethodAsync('LimpiarSeleccion');
                     }
                 }
             }
@@ -173,6 +178,7 @@ window.resizeCard = function (dotnet, cardId, element) {
             element.style.width = newW + 'px';
             element.style.height = newH + 'px';
             element.style.minHeight = 'unset';
+            window.updateConnectors();
         }
 
         function onMouseUp(e) {
@@ -206,6 +212,60 @@ window.getBoundingRect = function(element) {
         scrollLeft: element.scrollLeft,
         scrollTop: element.scrollTop
     };
+};
+
+window.drawConnectors = function(connections) {
+    const svg = document.getElementById('connectors-svg');
+    if (!svg) return;
+
+    svg.querySelectorAll('line[data-conn]').forEach(l => l.remove());
+
+    connections.forEach(conn => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('data-conn', 'true');
+        line.setAttribute('data-source', conn.sourceCardId);
+        line.setAttribute('data-target', conn.targetCardId);
+        line.setAttribute('stroke', '#6366f1');
+        line.setAttribute('stroke-width', '2');
+        line.setAttribute('opacity', '0.7');
+        line.setAttribute('marker-end', 'url(#arrowhead)');
+        svg.appendChild(line);
+    });
+
+    window.updateConnectors();
+};
+
+window.updateConnectors = function() {
+    const svg = document.getElementById('connectors-svg');
+    if (!svg) return;
+
+    svg.querySelectorAll('line[data-conn]').forEach(line => {
+        const sourceId = line.getAttribute('data-source');
+        const targetId = line.getAttribute('data-target');
+
+        const sourceEl = document.getElementById('card-' + sourceId);
+        const targetEl = document.getElementById('card-' + targetId);
+        if (!sourceEl || !targetEl) return;
+
+        const sx = parseInt(sourceEl.style.left) + sourceEl.offsetWidth / 2;
+        const sy = parseInt(sourceEl.style.top) + sourceEl.offsetHeight / 2;
+        const tx = parseInt(targetEl.style.left) + targetEl.offsetWidth / 2;
+        const ty = parseInt(targetEl.style.top) + targetEl.offsetHeight / 2;
+
+        line.setAttribute('x1', sx);
+        line.setAttribute('y1', sy);
+        line.setAttribute('x2', tx);
+        line.setAttribute('y2', ty);
+    });
+};
+
+window.initKeyboard = function(dotnet) {
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            dotnet.invokeMethodAsync('EliminarSeleccionados');
+        }
+    });
 };
 
 window.initSelection = function (dotnet) {
@@ -299,6 +359,7 @@ window.initSelection = function (dotnet) {
 
     tryInit(20);
 };
+
 document.addEventListener('mousedown', function(e) {
     if (!boardDotNet) return;
     if (e.target.closest('.board-context-menu')) return;
@@ -307,15 +368,36 @@ document.addEventListener('mousedown', function(e) {
     if (e.target.tagName === 'LABEL') return;
     boardDotNet.invokeMethodAsync('CerrarMenuDesdeJS');
 });
-window.initKeyboard = function(dotnet) {
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-            dotnet.invokeMethodAsync('EliminarSeleccionados');
-        }
-    });
+window.updatePreviewConnector = function(sourceId, mouseX, mouseY) {
+    const svg = document.getElementById('connectors-svg');
+    if (!svg) return;
+
+    let preview = svg.querySelector('line[data-preview]');
+    if (!preview) {
+        preview = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        preview.setAttribute('data-preview', 'true');
+        preview.setAttribute('stroke', '#6366f1');
+        preview.setAttribute('stroke-width', '2');
+        preview.setAttribute('opacity', '0.4');
+        preview.setAttribute('stroke-dasharray', '6,4');
+        preview.setAttribute('marker-end', 'url(#arrowhead)');
+        svg.appendChild(preview);
+    }
+
+    const sourceEl = document.getElementById('card-' + sourceId);
+    if (!sourceEl) return;
+
+    const sx = parseInt(sourceEl.style.left) + sourceEl.offsetWidth / 2;
+    const sy = parseInt(sourceEl.style.top) + sourceEl.offsetHeight / 2;
+
+    preview.setAttribute('x1', sx);
+    preview.setAttribute('y1', sy);
+    preview.setAttribute('x2', mouseX);
+    preview.setAttribute('y2', mouseY);
 };
-window.setZCounter = function(value) {
-    console.log('setZCounter called with:', value);
-    zCounter = value;
+window.removePreviewConnector = function() {
+    const svg = document.getElementById('connectors-svg');
+    if (!svg) return;
+    const preview = svg.querySelector('line[data-preview]');
+    if (preview) preview.remove();
 };

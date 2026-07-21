@@ -6,6 +6,7 @@
      id="card-@Card.Id"
      @ref="elementRef"
      @onclick="HandleClick"
+     @onclick:stopPropagation="true"
      @oncontextmenu="HandleContextMenu"
      @oncontextmenu:preventDefault="true"
      @ontouchstart="HandleTouchStart"
@@ -38,6 +39,8 @@
     [Parameter] public EventCallback<Card> OnSave { get; set; }
     [Parameter] public EventCallback<(Card, double, double)> OnContextMenu { get; set; }
     [Parameter] public bool IsSelected { get; set; }
+    [Parameter] public bool ModoConector { get; set; }
+    [Parameter] public EventCallback<Guid> OnConectorClick { get; set; }
 
     private ElementReference elementRef;
     private bool dragInitialized = false;
@@ -51,7 +54,15 @@
 
     private async Task HandleClick(MouseEventArgs e)
     {
+        Console.WriteLine($"HandleClick ModoConector={ModoConector} isDragging={isDragging}");
         if (isDragging || justFinishedDragging || justFinishedResizing) return;
+        
+        if (ModoConector)
+        {
+            await OnConectorClick.InvokeAsync(Card.Id);
+            return;
+        }
+        
         await OnNavigate.InvokeAsync(Card.LinkedBoardId ?? Guid.Empty);
     }
 
@@ -145,4 +156,5 @@
             Task.Delay(200).ContinueWith(_ => justFinishedResizing = false);
         }
     }
+
 }

@@ -29,7 +29,8 @@ else
             <!-- Canvas -->
             <div class="relative flex-1 overflow-auto canvas-bg"
                 style="background-color: #0a0a0f; background-image: radial-gradient(circle, #1f2937 1px, transparent 1px); background-size: 28px 28px;"
-                @ref="canvasRef">
+                @ref="canvasRef"
+                @onmousemove="HandleMouseMove">
 
                 <!-- Toolbar superior flotante -->
                 <div class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-2xl px-5 py-2 shadow-2xl" style="z-index: 9999;">
@@ -74,32 +75,45 @@ else
 
                 <!-- Toolbar lateral flotante -->
                 <div class="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2" style="z-index: 9999;">
-                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" OnAddChecklist="AgregarChecklist" OnAddLink="AgregarLink" OnAddCountdown="AgregarCountdown" />
+                    <BoardToolbar IsMobile="false" OnAddCard="AgregarCard" OnAddBoard="AgregarBoard" OnAddImage="AgregarImagen" OnAddChecklist="AgregarChecklist" OnAddLink="AgregarLink" OnAddCountdown="AgregarCountdown" OnAddConnector="ToggleModoConector" IsConnectorMode="modoConector"/>
                 </div>
+
+                <!-- SVG para conectores -->
+                <svg id="connectors-svg" class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#6366f1" />
+                        </marker>
+                    </defs>
+                </svg>
 
                 @foreach (var card in cards.OrderBy(c => c.CreatedAt))
                 {
                     @if (card.Type == CardType.Board)
                     {
                         <BoardCard Card="card"
-                            IsSelected="seleccionados.Contains(card.Id)"
-                            OnDelete="EliminarCard"
-                            OnMove="HandleCardMoved"
-                            OnNavigate="Navegar"
-                            OnSave="GuardarCard"
-                            OnContextMenu="HandleBoardContextMenu" />
+                                    IsSelected="seleccionados.Contains(card.Id)"
+                                    OnDelete="EliminarCard"
+                                    OnMove="HandleCardMoved"
+                                    OnNavigate="Navegar"
+                                    OnSave="GuardarCard"
+                                    OnContextMenu="HandleBoardContextMenu" />
                     }
                     else if (card.Type == CardType.Image)
                     {
                         <ImageCard Card="card"
-                                IsSelected="seleccionados.Contains(card.Id)"
-                                OnDelete="EliminarCard"
-                                OnMove="HandleCardMoved"
-                                OnSave="GuardarCard" />
+                                    ModoConector="modoConector"
+                                    OnConectorClick="HandleCardClickConector"
+                                    IsSelected="seleccionados.Contains(card.Id)"
+                                    OnDelete="EliminarCard"
+                                    OnMove="HandleCardMoved"
+                                    OnSave="GuardarCard" />
                     }
                     else if (card.Type == CardType.Checklist)
                     {
                         <ChecklistCard Card="card"
+                                    ModoConector="modoConector"
+                                    OnConectorClick="HandleCardClickConector"
                                     IsSelected="seleccionados.Contains(card.Id)"
                                     OnDelete="EliminarCard"
                                     OnMove="HandleCardMoved"
@@ -108,28 +122,34 @@ else
                     else if (card.Type == CardType.Link)
                     {
                         <LinkCard Card="card"
-                                IsSelected="seleccionados.Contains(card.Id)"
-                                OnDelete="EliminarCard"
-                                OnMove="HandleCardMoved"
-                                OnSave="GuardarCard" />
+                                    ModoConector="modoConector"
+                                    OnConectorClick="HandleCardClickConector"
+                                    IsSelected="seleccionados.Contains(card.Id)"
+                                    OnDelete="EliminarCard"
+                                    OnMove="HandleCardMoved"
+                                    OnSave="GuardarCard" />
                     }
                     else if (card.Type == CardType.Countdown)
                     {
                         <CountdownCard Card="card"
-                            IsSelected="seleccionados.Contains(card.Id)"
-                            OnDelete="EliminarCard"
-                            OnMove="HandleCardMoved"
-                            OnSave="GuardarCard" />
+                                    ModoConector="modoConector"
+                                    OnConectorClick="HandleCardClickConector"
+                                    IsSelected="seleccionados.Contains(card.Id)"
+                                    OnDelete="EliminarCard"
+                                    OnMove="HandleCardMoved"
+                                    OnSave="GuardarCard" />
                     }
                     else
                     {
                         <CardItem Card="card"
-                                IsEditing="cardEditandoId == card.Id"
-                                IsSelected="seleccionados.Contains(card.Id)"
-                                OnDelete="EliminarCard"
-                                OnSave="GuardarCard"
-                                OnEdit="(id) => { cardEditandoId = id; }"
-                                OnMove="HandleCardMoved" />
+                                    ModoConector="modoConector"
+                                    OnConectorClick="HandleCardClickConector"
+                                    IsEditing="cardEditandoId == card.Id"
+                                    IsSelected="seleccionados.Contains(card.Id)"
+                                    OnDelete="EliminarCard"
+                                    OnSave="GuardarCard"
+                                    OnEdit="(id) => { cardEditandoId = id; }"
+                                    OnMove="HandleCardMoved" />
                     }
                 }
 
@@ -252,35 +272,47 @@ else
         await CargarBoard();
     }
 
-    private async Task CargarBoard()
-    {
-        try
+    private async Task CargarBoard() 
+    { 
+        try 
+        { 
+            error = null; 
+            board = null; 
+            cards = new(); 
+            breadcrumb = new(); 
+            connections = new(); 
+
+            var http = HttpClientFactory.CreateClient("KreativeApi"); 
+
+            board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}"); 
+            var result = await http.GetFromJsonAsync<List<Card>>($"api/cards?boardId={Id}"); 
+            var bc = await http.GetFromJsonAsync<List<BreadcrumbItem>>($"api/boards/{Id}/breadcrumb"); 
+            var conns = await http.GetFromJsonAsync<List<Connection>>($"api/connections?boardId={Id}");
+
+            if (result is not null) cards = result; 
+            if (bc is not null) breadcrumb = bc; 
+            if (conns is not null) connections = conns;
+
+            if (cards.Any()) 
+            { 
+                nextX = (int)cards.Max(c => c.X) + 20; 
+                nextY = (int)cards.Max(c => c.Y) + 20; 
+            } 
+        } 
+        catch (Exception ex) 
+        { 
+            error = ex.Message; 
+        } 
+
+        tituloBoard = board?.Title ?? ""; 
+
+        if (connections.Any())
         {
-            error = null;
-            board = null;
-            cards = new();
-            breadcrumb = new();
-
-            var http = HttpClientFactory.CreateClient("KreativeApi");
-
-            board = await http.GetFromJsonAsync<Board>($"api/boards/{Id}");
-            var result = await http.GetFromJsonAsync<List<Card>>($"api/cards?boardId={Id}");
-            var bc = await http.GetFromJsonAsync<List<BreadcrumbItem>>($"api/boards/{Id}/breadcrumb");
-
-            if (result is not null) cards = result;
-            if (bc is not null) breadcrumb = bc;
-
-            if (cards.Any())
-            {
-                nextX = (int)cards.Max(c => c.X) + 20;
-                nextY = (int)cards.Max(c => c.Y) + 20;
-            }
+            var connData = connections.Select(c => new { 
+                sourceCardId = c.SourceCardId.ToString(), 
+                targetCardId = c.TargetCardId.ToString() 
+            });
         }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-        }
-        tituloBoard = board?.Title ?? "";
     }
 
     private async Task AgregarCard()
@@ -394,15 +426,22 @@ else
             await JS.InvokeVoidAsync("initSelection", DotNetObjectReference.Create(this));
             await JS.InvokeVoidAsync("setBoardDotNet", DotNetObjectReference.Create(this));
             await JS.InvokeVoidAsync("initKeyboard", DotNetObjectReference.Create(this));
-            
-            if (cards.Any())
-            {
-                var maxZ = cards.Max(c => c.ZIndex);
-                Console.WriteLine($"setZCounter: {maxZ}");
-                await JS.InvokeVoidAsync("setZCounter", maxZ);
-            }
         }
+
+        if (cards.Any())
+            await JS.InvokeVoidAsync("setZCounter", cards.Max(c => c.ZIndex));
+
+        await Task.Delay(150);
         await JS.InvokeVoidAsync("lucide.createIcons");
+
+        if (connections.Any())
+        {
+            var connData = connections.Select(c => new { 
+                sourceCardId = c.SourceCardId.ToString(), 
+                targetCardId = c.TargetCardId.ToString() 
+            });
+            await JS.InvokeVoidAsync("drawConnectors", connData);
+        }
     }
 
     [JSInvokable]
@@ -607,6 +646,74 @@ else
         card.ZIndex = zIndex;
         var http = HttpClientFactory.CreateClient("KreativeApi");
         await http.PutAsJsonAsync($"api/cards/{card.Id}", card);
+    }
+    
+    private List<Connection> connections = new();
+    private Guid? conectandoDesde = null;
+    private bool modoConector = false;
+    private int mouseX = 0, mouseY = 0;
+
+    private async Task ToggleModoConector()
+    {
+        modoConector = !modoConector;
+        conectandoDesde = null;
+        await JS.InvokeVoidAsync("removePreviewConnector");
+    }
+
+    private async Task HandleCardClickConector(Guid cardId)
+    {
+        if (!modoConector) return;
+
+        if (conectandoDesde is null)
+        {
+            conectandoDesde = cardId;
+            await JS.InvokeVoidAsync("removePreviewConnector");
+            return;
+        }
+
+        if (conectandoDesde == cardId)
+        {
+            conectandoDesde = null;
+            await JS.InvokeVoidAsync("removePreviewConnector");
+            return;
+        }
+
+        // Crear la conexión
+        var http = HttpClientFactory.CreateClient("KreativeApi");
+        var conn = new Connection
+        {
+            BoardId = Id,
+            SourceCardId = conectandoDesde.Value,
+            TargetCardId = cardId
+        };
+
+        var response = await http.PostAsJsonAsync("api/connections", conn);
+        var creada = await response.Content.ReadFromJsonAsync<Connection>();
+        if (creada is not null)
+        {
+            connections.Add(creada);
+            conectandoDesde = null;
+            StateHasChanged();
+            await JS.InvokeVoidAsync("removePreviewConnector");
+        }
+
+        var connData = connections.Select(c => new { 
+            sourceCardId = c.SourceCardId.ToString(), 
+            targetCardId = c.TargetCardId.ToString() 
+        });
+        await JS.InvokeVoidAsync("drawConnectors", connData);
+    }
+
+    private async Task HandleMouseMove(MouseEventArgs e)
+    {
+        if (modoConector && conectandoDesde is not null)
+        {
+            var rect = await JS.InvokeAsync<BoundingRect>("getBoundingRect", canvasRef);
+            mouseX = (int)(e.ClientX - rect.Left + rect.ScrollLeft);
+            mouseY = (int)(e.ClientY - rect.Top + rect.ScrollTop);
+            await JS.InvokeVoidAsync("updatePreviewConnector", 
+                conectandoDesde.Value.ToString(), mouseX, mouseY);
+        }
     }
     
 }
